@@ -1,4 +1,4 @@
-/* Pixabay-themed styles for the mass downloader interface */
+﻿/* Pixabay-themed styles for the mass downloader interface */
 :root {
     --pixabay-green: #4bc24b;
     --pixabay-green-dark: #3ba93b;
@@ -11,10 +11,30 @@
     --pixabay-border: #e9ecef;
     --pixabay-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     --pixabay-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
+    --pixabay-blue: #007bff;
+    --pixabay-blue-dark: #0056b3;
+    --pixabay-blue-light: #0088ff;
+    --pixabay-purple: #6f42c1;
+    --pixabay-purple-dark: #5a2d8c;
+    --pixabay-purple-light: #7c4ddd;
+    --pixabay-warning: #ffc107;
+    --pixabay-warning-light: #ffeaa7;
+    --pixabay-warning-dark: #856404;
+    --pixabay-danger: #dc3545;
+    --pixabay-danger-light: #f8d7da;
+    --pixabay-danger-dark: #721c24;
+    --pixabay-success-light: #d4edda;
+    --pixabay-success-border: #c3e6cb;
+    --pixabay-success-text: #155724;
+    --pixabay-white: #ffffff;
+    --pixabay-dark: #2d3748;
+    --pixabay-dark-light: #4a5568;
+    --pixabay-text-light: #e2e8f0;
+    --pixabay-dark-bg: #1a202c;
 }
 
 .pixabay-mass-downloader-container {
-    background: white;
+    background: var(--pixabay-white);
     border: 1px solid var(--pixabay-border);
     border-radius: 12px;
     padding: 24px;
@@ -52,7 +72,7 @@
 }
 
 .mass-download-section h3::before {
-    content: '??';
+    content: '📥';
     font-size: 18px;
 }
 
@@ -64,7 +84,7 @@
 
 .mass-download-btn {
     background: linear-gradient(135deg, var(--pixabay-green), var(--pixabay-green-dark));
-    color: white;
+    color: var(--pixabay-white);
     border: none;
     padding: 14px 20px;
     border-radius: 8px;
@@ -108,16 +128,16 @@
 }
 
 .mass-download-btn[data-type="photo"] {
-    background: linear-gradient(135deg, var(--pixabay-green), var(--pixabay-green-dark));
+    background: linear-gradient(135deg, var(--pixabay-blue), var(--pixabay-blue-dark));
 }
 
 .mass-download-btn[data-type="photo"]:hover {
-    background: linear-gradient(135deg, var(--pixabay-green-light), var(--pixabay-green));
-    box-shadow: 0 6px 16px rgba(75, 194, 75, 0.3);
+    background: linear-gradient(135deg, var(--pixabay-blue-light), var(--pixabay-blue));
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3);
 }
 
 .mass-download-btn[data-type="music"] {
-    background: linear-gradient(135deg, var(--pixabay-orange), var(--pixabay-orange-light));
+    background: linear-gradient(135deg, var(--pixabay-orange), #e6680b);
 }
 
 .mass-download-btn[data-type="music"]:hover {
@@ -126,17 +146,17 @@
 }
 
 .mass-download-btn[data-type="video"] {
-    background: linear-gradient(135deg, var(--pixabay-gray), var(--pixabay-gray-dark));
+    background: linear-gradient(135deg, var(--pixabay-purple), var(--pixabay-purple-dark));
 }
 
 .mass-download-btn[data-type="video"]:hover {
-    background: linear-gradient(135deg, var(--pixabay-gray-light), var(--pixabay-gray));
-    box-shadow: 0 6px 16px rgba(108, 117, 125, 0.3);
+    background: linear-gradient(135deg, var(--pixabay-purple-light), var(--pixabay-purple));
+    box-shadow: 0 6px 16px rgba(111, 66, 193, 0.3);
 }
 
 .api-key-section {
-    background: linear-gradient(135deg, var(--pixabay-gray-light), var(--pixabay-border));
-    border: 1px solid var(--pixabay-border);
+    background: linear-gradient(135deg, #fff3cd, var(--pixabay-warning-light));
+    border: 1px solid #f0e5a0;
     border-radius: 8px;
     padding: 20px;
     margin: 16px 0;
@@ -144,7 +164,7 @@
 }
 
 .api-key-section::before {
-    content: '??';
+    content: '🔑';
     position: absolute;
     top: 16px;
     left: 16px;
@@ -153,7 +173,7 @@
 
 .api-key-section h4 {
     margin: 0 0 12px 32px;
-    color: var(--pixabay-gray-dark);
+    color: var(--pixabay-warning-dark);
     font-size: 16px;
     font-weight: 600;
 }
@@ -161,7 +181,7 @@
 .api-key-section input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid var(--pixabay-border);
+    border: 2px solid #f0e5a0;
     border-radius: 6px;
     margin-bottom: 12px;
     font-size: 14px;
@@ -177,7 +197,7 @@
 
 .api-key-section button {
     background: var(--pixabay-green);
-    color: white;
+    color: var(--pixabay-white);
     border: none;
     padding: 10px 20px;
     border-radius: 6px;
@@ -211,7 +231,7 @@
 }
 
 .progress-section h4::before {
-    content: '??';
+    content: '📊';
     font-size: 16px;
 }
 
@@ -263,15 +283,15 @@
 
 /* Success and error states */
 .download-complete {
-    background: linear-gradient(135deg, var(--pixabay-green-light), var(--pixabay-green));
+    background: linear-gradient(135deg, var(--pixabay-success-light), var(--pixabay-success-border));
     border-color: var(--pixabay-green);
-    color: white;
+    color: var(--pixabay-success-text);
 }
 
 .download-error {
-    background: linear-gradient(135deg, var(--pixabay-orange-light), var(--pixabay-orange));
-    border-color: var(--pixabay-orange);
-    color: white;
+    background: linear-gradient(135deg, var(--pixabay-danger-light), #f1aeb5);
+    border-color: var(--pixabay-danger);
+    color: var(--pixabay-danger-dark);
 }
 
 /* Mobile responsiveness */
@@ -300,33 +320,33 @@
     }
 }
 
-/* Dark mode support */
+/* Dark mode support (if Pixabay implements it) */
 @media (prefers-color-scheme: dark) {
     .pixabay-mass-downloader-container {
-        background: var(--pixabay-gray-dark);
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: var(--pixabay-dark);
+        border-color: var(--pixabay-dark-light);
+        color: var(--pixabay-text-light);
     }
     
     .mass-download-section h3 {
-        color: var(--pixabay-gray-light);
+        color: var(--pixabay-text-light);
     }
     
     .api-key-section {
-        background: linear-gradient(135deg, var(--pixabay-gray-dark), var(--pixabay-gray));
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: linear-gradient(135deg, var(--pixabay-dark), var(--pixabay-dark-bg));
+        border-color: var(--pixabay-dark-light);
+        color: var(--pixabay-text-light);
     }
     
     .api-key-section input {
-        background: var(--pixabay-gray-dark);
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: var(--pixabay-dark-bg);
+        border-color: var(--pixabay-dark-light);
+        color: var(--pixabay-text-light);
     }
     
     .progress-section {
-        background: linear-gradient(135deg, var(--pixabay-gray-dark), var(--pixabay-gray));
-        border-color: var(--pixabay-gray);
+        background: linear-gradient(135deg, var(--pixabay-dark), var(--pixabay-dark-bg));
+        border-color: var(--pixabay-dark-light);
     }
 }
 

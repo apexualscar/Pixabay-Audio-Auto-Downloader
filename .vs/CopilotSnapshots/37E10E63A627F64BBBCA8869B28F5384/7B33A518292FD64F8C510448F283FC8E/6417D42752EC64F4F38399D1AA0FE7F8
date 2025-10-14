@@ -1,4 +1,4 @@
-/* Pixabay-themed styles for the mass downloader interface */
+﻿/* Pixabay-themed styles for the mass downloader interface */
 :root {
     --pixabay-green: #4bc24b;
     --pixabay-green-dark: #3ba93b;
@@ -52,7 +52,7 @@
 }
 
 .mass-download-section h3::before {
-    content: '??';
+    content: '📥';
     font-size: 18px;
 }
 
@@ -144,7 +144,7 @@
 }
 
 .api-key-section::before {
-    content: '??';
+    content: '🔑';
     position: absolute;
     top: 16px;
     left: 16px;
@@ -211,7 +211,7 @@
 }
 
 .progress-section h4::before {
-    content: '??';
+    content: '📊';
     font-size: 16px;
 }
 

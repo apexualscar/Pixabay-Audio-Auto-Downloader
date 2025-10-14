@@ -1,4 +1,4 @@
-// Optimized popup script - loads instantly
+﻿// Optimized popup script - loads instantly
 let currentUsername = null;
 let isDownloading = false;
 
@@ -24,7 +24,7 @@ async function initializePopup() {
         
     } catch (error) {
         console.error('Error initializing popup:', error);
-        updateStatusMessage('?', 'Error loading extension', 'error');
+        updateStatusMessage('❌', 'Error loading extension', 'error');
     }
 }
 
@@ -48,7 +48,7 @@ function setupEventListeners() {
 }
 
 async function updateStatus() {
-    updateStatusMessage('?', 'Checking status...', '');
+    updateStatusMessage('⏳', 'Checking status...', '');
 }
 
 async function checkApiKey() {
@@ -66,7 +66,7 @@ async function checkCurrentPage() {
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
         if (!activeTab || !activeTab.url) {
-            updateStatusMessage('??', 'No active tab detected', 'warning');
+            updateStatusMessage('ℹ️', 'No active tab detected', 'warning');
             return;
         }
         
@@ -76,19 +76,19 @@ async function checkCurrentPage() {
             currentUsername = extractUsernameFromUrl(activeTab.url);
             if (currentUsername) {
                 showDownloadSection(currentUsername);
-                updateStatusMessage('?', `Ready to download from: ${currentUsername}`, 'success');
+                updateStatusMessage('✅', `Ready to download from: ${currentUsername}`, 'success');
             } else {
-                updateStatusMessage('??', 'Unable to detect username', 'warning');
+                updateStatusMessage('⚠️', 'Unable to detect username', 'warning');
             }
         } else if (activeTab.url.includes('pixabay.com')) {
-            updateStatusMessage('??', 'Navigate to a user profile page', 'warning');
+            updateStatusMessage('⚠️', 'Navigate to a user profile page', 'warning');
         } else {
-            updateStatusMessage('??', 'Not on Pixabay. Visit a user profile.', '');
+            updateStatusMessage('ℹ️', 'Not on Pixabay. Visit a user profile.', '');
         }
         
     } catch (error) {
         console.error('Error checking current page:', error);
-        updateStatusMessage('?', 'Error checking page', 'error');
+        updateStatusMessage('❌', 'Error checking page', 'error');
     }
 }
 
@@ -115,7 +115,7 @@ function updateStatusMessage(icon, message, type = '') {
 function showApiKeySection() {
     document.getElementById('apiKeySection').classList.remove('hidden');
     document.getElementById('downloadSection').classList.add('hidden');
-    updateStatusMessage('??', 'API key required to continue', 'warning');
+    updateStatusMessage('🔑', 'API key required to continue', 'warning');
 }
 
 function showDownloadSection(username) {
@@ -130,7 +130,7 @@ async function saveApiKey() {
     const apiKey = apiKeyInput.value.trim();
     
     if (!apiKey) {
-        updateStatusMessage('??', 'Please enter an API key', 'warning');
+        updateStatusMessage('⚠️', 'Please enter an API key', 'warning');
         return;
     }
     
@@ -145,7 +145,7 @@ async function saveApiKey() {
         
         if (isValid) {
             await chrome.storage.local.set({ pixabayApiKey: apiKey });
-            updateStatusMessage('?', 'API key saved successfully!', 'success');
+            updateStatusMessage('✅', 'API key saved successfully!', 'success');
             apiKeyInput.value = '';
             
             // Check current page again
@@ -154,12 +154,12 @@ async function saveApiKey() {
             }, 1000);
             
         } else {
-            updateStatusMessage('?', 'Invalid API key. Please check and try again.', 'error');
+            updateStatusMessage('❌', 'Invalid API key. Please check and try again.', 'error');
         }
         
     } catch (error) {
         console.error('Error saving API key:', error);
-        updateStatusMessage('?', 'Error validating API key', 'error');
+        updateStatusMessage('❌', 'Error validating API key', 'error');
     } finally {
         saveBtn.innerHTML = 'Save Key';
         saveBtn.disabled = false;
@@ -216,11 +216,11 @@ async function startDownload(contentType) {
         });
         
         console.log('Background script response:', response);
-        updateStatusMessage('??', `Starting download of ${contentType} from ${currentUsername}...`, 'success');
+        updateStatusMessage('🚀', `Starting download of ${contentType} from ${currentUsername}...`, 'success');
         
     } catch (error) {
         console.error('Download error:', error);
-        updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
+        updateStatusMessage('❌', `Download failed: ${error.message}`, 'error');
         hideProgress();
         
         // Reset button
@@ -259,16 +259,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     switch (message.action) {
         case 'DOWNLOAD_STARTED':
-            updateStatusMessage('??', `Downloading ${message.contentType} from ${message.username}...`, 'success');
+            updateStatusMessage('🚀', `Downloading ${message.contentType} from ${message.username}...`, 'success');
             break;
             
         case 'UPDATE_PROGRESS':
             updateProgress(message.current, message.total);
-            updateStatusMessage('??', `Downloaded ${message.current}/${message.total} files`, 'success');
+            updateStatusMessage('📥', `Downloaded ${message.current}/${message.total} files`, 'success');
             break;
             
         case 'DOWNLOAD_COMPLETE':
-            updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
+            updateStatusMessage('✅', `Download complete! ${message.count} files downloaded.`, 'success');
             hideProgress();
             resetDownloadButtons();
             isDownloading = false;
@@ -276,7 +276,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             
         case 'DOWNLOAD_ERROR':
             console.error('Download error from background:', message.error);
-            updateStatusMessage('?', `Download error: ${message.error}`, 'error');
+            updateStatusMessage('❌', `Download error: ${message.error}`, 'error');
             hideProgress();
             resetDownloadButtons();
             isDownloading = false;
@@ -292,13 +292,13 @@ function resetDownloadButtons() {
         const type = btn.dataset.type;
         switch (type) {
             case 'photo':
-                btn.innerHTML = '?? Download All Images';
+                btn.innerHTML = '📷 Download All Images';
                 break;
             case 'music':
-                btn.innerHTML = '?? Download All Audio';
+                btn.innerHTML = '🎵 Download All Audio';
                 break;
             case 'video':
-                btn.innerHTML = '?? Download All Videos';
+                btn.innerHTML = '🎬 Download All Videos';
                 break;
         }
     });

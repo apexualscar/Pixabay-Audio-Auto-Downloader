@@ -1,4 +1,4 @@
-{
+﻿{
   "manifest_version": 3,
   "name": "Pixabay Mass Downloader",
   "version": "1.0",
@@ -10,8 +10,7 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://pixabay.com/*",
-    "https://cdn.pixabay.com/*"
+    "https://pixabay.com/*"
   ],
   "content_scripts": [
     {
@@ -29,7 +28,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content-styles.css"],
+      "resources": ["blazor-app/*"],
       "matches": ["https://pixabay.com/*"]
     }
   ]

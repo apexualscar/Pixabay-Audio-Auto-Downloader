@@ -1,4 +1,4 @@
-// Optimized popup script - loads instantly
+﻿// Optimized popup script - loads instantly
 let currentUsername = null;
 let isDownloading = false;
 
@@ -70,8 +70,6 @@ async function checkCurrentPage() {
             return;
         }
         
-        console.log('Current tab URL:', activeTab.url);
-        
         if (activeTab.url.includes('pixabay.com/users/')) {
             currentUsername = extractUsernameFromUrl(activeTab.url);
             if (currentUsername) {
@@ -93,15 +91,8 @@ async function checkCurrentPage() {
 }
 
 function extractUsernameFromUrl(url) {
-    try {
-        const match = url.match(/\/users\/([^\/\?]+)/);
-        const username = match ? decodeURIComponent(match[1]) : null;
-        console.log('Extracted username:', username);
-        return username;
-    } catch (error) {
-        console.error('Error extracting username:', error);
-        return null;
-    }
+    const match = url.match(/\/users\/([^\/\?]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
 }
 
 function updateStatusMessage(icon, message, type = '') {
@@ -139,7 +130,6 @@ async function saveApiKey() {
     saveBtn.disabled = true;
     
     try {
-        console.log('Validating API key...');
         // Quick validation
         const isValid = await validateApiKey(apiKey);
         
@@ -168,10 +158,8 @@ async function saveApiKey() {
 
 async function validateApiKey(apiKey) {
     try {
-        console.log('Testing API key with Pixabay...');
         const testUrl = `https://pixabay.com/api/?key=${apiKey}&per_page=3`;
         const response = await fetch(testUrl);
-        console.log('API validation response:', response.status, response.statusText);
         return response.ok;
     } catch (error) {
         console.error('API validation error:', error);
@@ -180,18 +168,13 @@ async function validateApiKey(apiKey) {
 }
 
 async function startDownload(contentType) {
-    if (!currentUsername || isDownloading) {
-        console.log('Cannot start download:', { currentUsername, isDownloading });
-        return;
-    }
+    if (!currentUsername || isDownloading) return;
     
     isDownloading = true;
     const downloadBtn = document.querySelector(`[data-type="${contentType}"]`);
     const originalText = downloadBtn.innerHTML;
     
     try {
-        console.log(`Starting download: ${contentType} from ${currentUsername}`);
-        
         // Show progress
         showProgress();
         downloadBtn.innerHTML = '<div class="spinner"></div> Starting...';
@@ -205,25 +188,21 @@ async function startDownload(contentType) {
             throw new Error('No API key found');
         }
         
-        console.log('Sending download message to background script...');
-        
         // Send message to background script to start download
-        const response = await chrome.runtime.sendMessage({
+        await chrome.runtime.sendMessage({
             action: 'START_DOWNLOAD',
             username: currentUsername,
             contentType: contentType,
             apiKey: apiKey
         });
         
-        console.log('Background script response:', response);
         updateStatusMessage('??', `Starting download of ${contentType} from ${currentUsername}...`, 'success');
         
     } catch (error) {
         console.error('Download error:', error);
         updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
         hideProgress();
-        
-        // Reset button
+    } finally {
         downloadBtn.innerHTML = originalText;
         downloadBtn.disabled = false;
         isDownloading = false;
@@ -255,54 +234,28 @@ function updateProgress(current, total) {
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log('Received message in popup:', message);
-    
     switch (message.action) {
-        case 'DOWNLOAD_STARTED':
-            updateStatusMessage('??', `Downloading ${message.contentType} from ${message.username}...`, 'success');
-            break;
-            
         case 'UPDATE_PROGRESS':
             updateProgress(message.current, message.total);
-            updateStatusMessage('??', `Downloaded ${message.current}/${message.total} files`, 'success');
             break;
             
         case 'DOWNLOAD_COMPLETE':
             updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
             hideProgress();
-            resetDownloadButtons();
             isDownloading = false;
             break;
             
         case 'DOWNLOAD_ERROR':
-            console.error('Download error from background:', message.error);
             updateStatusMessage('?', `Download error: ${message.error}`, 'error');
             hideProgress();
-            resetDownloadButtons();
             isDownloading = false;
+            break;
+            
+        case 'DOWNLOAD_STARTED':
+            updateStatusMessage('??', `Downloading ${message.contentType} from ${message.username}...`, 'success');
             break;
     }
 });
-
-function resetDownloadButtons() {
-    // Reset all download buttons
-    const buttons = document.querySelectorAll('.download-btn[data-type]');
-    buttons.forEach(btn => {
-        btn.disabled = false;
-        const type = btn.dataset.type;
-        switch (type) {
-            case 'photo':
-                btn.innerHTML = '?? Download All Images';
-                break;
-            case 'music':
-                btn.innerHTML = '?? Download All Audio';
-                break;
-            case 'video':
-                btn.innerHTML = '?? Download All Videos';
-                break;
-        }
-    });
-}
 
 // Refresh status when popup is opened
 document.addEventListener('visibilitychange', () => {
@@ -310,6 +263,3 @@ document.addEventListener('visibilitychange', () => {
         setTimeout(checkCurrentPage, 100);
     }
 });
-
-// Add debugging
-console.log('Popup script loaded successfully');

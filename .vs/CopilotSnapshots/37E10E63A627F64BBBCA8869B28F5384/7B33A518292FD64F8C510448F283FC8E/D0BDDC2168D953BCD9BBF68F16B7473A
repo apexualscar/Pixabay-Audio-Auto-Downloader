@@ -1,11 +1,5 @@
-// Background service worker for the Chrome extension
+﻿// Background service worker for the Chrome extension
 console.log('Pixabay Mass Downloader background script loaded');
-
-// Rate limiting variables
-const API_RATE_LIMIT = 60; // requests per second
-const RATE_LIMIT_WINDOW = 1000; // 1 second in milliseconds
-let requestQueue = [];
-let isProcessingQueue = false;
 
 // Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -23,10 +17,23 @@ async function handleDownloadRequest(request, tabId) {
         console.log(`Starting download for user: ${username}, type: ${contentType}`);
         
         // Notify that download is starting
-        notifyDownloadStarted(tabId, username, contentType);
+        if (tabId) {
+            chrome.tabs.sendMessage(tabId, {
+                action: 'DOWNLOAD_STARTED',
+                username: username,
+                contentType: contentType
+            }).catch(() => {}); // Ignore errors if content script not present
+        }
         
-        // Get user's submissions from Pixabay API with rate limiting
-        const submissions = await fetchUserSubmissionsWithRateLimit(username, contentType, apiKey);
+        // Send to popup as well
+        chrome.runtime.sendMessage({
+            action: 'DOWNLOAD_STARTED',
+            username: username,
+            contentType: contentType
+        }).catch(() => {});
+        
+        // Get user's submissions from Pixabay API
+        const submissions = await fetchUserSubmissions(username, contentType, apiKey);
         
         if (submissions.length === 0) {
             const errorMsg = 'No submissions found for this user and content type';
@@ -53,8 +60,8 @@ async function handleDownloadRequest(request, tabId) {
                 // Update progress
                 notifyProgress(tabId, downloadedCount, totalCount);
                 
-                // Add delay to avoid overwhelming the download system
-                await sleep(100);
+                // Add delay to avoid overwhelming the system and respect rate limits
+                await sleep(150);
                 
             } catch (error) {
                 console.error(`Failed to download ${submission.id}:`, error);
@@ -71,7 +78,7 @@ async function handleDownloadRequest(request, tabId) {
     }
 }
 
-async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) {
+async function fetchUserSubmissions(username, contentType, apiKey) {
     const baseUrl = 'https://pixabay.com/api/';
     const submissions = [];
     let page = 1;
@@ -79,28 +86,10 @@ async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) 
     
     try {
         while (true) {
-            // Construct API URL with proper parameters
-            const params = new URLSearchParams({
-                key: apiKey,
-                username: username,
-                category: contentType === 'photo' ? 'all' : contentType,
-                image_type: contentType === 'photo' ? 'all' : undefined,
-                per_page: perPage,
-                page: page,
-                safesearch: 'true'
-            });
-            
-            // Remove undefined params
-            Array.from(params.entries()).forEach(([key, value]) => {
-                if (value === undefined) params.delete(key);
-            });
-            
-            const url = `${baseUrl}?${params.toString()}`;
+            const url = `${baseUrl}?key=${apiKey}&username=${encodeURIComponent(username)}&category=${contentType}&per_page=${perPage}&page=${page}&safesearch=true`;
             
             console.log(`Fetching page ${page} for ${username}...`);
-            
-            // Use rate-limited request
-            const response = await makeRateLimitedRequest(url);
+            const response = await fetch(url);
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -123,8 +112,8 @@ async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) 
             
             page++;
             
-            // Respect API rate limits - small delay between requests
-            await sleep(500);
+            // Add delay between API calls to be respectful
+            await sleep(300);
         }
         
         return submissions;
@@ -133,62 +122,6 @@ async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) 
         console.error('Error fetching submissions:', error);
         throw error;
     }
-}
-
-async function makeRateLimitedRequest(url) {
-    return new Promise((resolve, reject) => {
-        const requestTime = Date.now();
-        
-        // Add request to queue
-        requestQueue.push({
-            url,
-            timestamp: requestTime,
-            resolve,
-            reject
-        });
-        
-        // Process queue if not already processing
-        if (!isProcessingQueue) {
-            processRequestQueue();
-        }
-    });
-}
-
-async function processRequestQueue() {
-    isProcessingQueue = true;
-    
-    while (requestQueue.length > 0) {
-        const now = Date.now();
-        
-        // Remove requests older than rate limit window
-        requestQueue = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW * 10);
-        
-        // Check if we can make a request (stay under rate limit)
-        const recentRequests = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW);
-        
-        if (recentRequests.length >= API_RATE_LIMIT) {
-            // Wait before processing more requests
-            await sleep(100);
-            continue;
-        }
-        
-        // Get next request
-        const request = requestQueue.shift();
-        if (!request) continue;
-        
-        try {
-            console.log(`Making API request: ${request.url}`);
-            const response = await fetch(request.url);
-            request.resolve(response);
-        } catch (error) {
-            request.reject(error);
-        }
-        
-        // Small delay between requests
-        await sleep(20);
-    }
-    
-    isProcessingQueue = false;
 }
 
 async function downloadFileToFolder(submission, contentType, folderName, username) {
@@ -200,11 +133,9 @@ async function downloadFileToFolder(submission, contentType, folderName, usernam
     }
     
     // Create full filename with proper extension
-    const safeUser = sanitizeFilename(submission.user || username);
-    const safeTag = sanitizeFilename(getFirstTag(submission.tags) || 'content');
-    const fullFilename = `${folderName}/${safeUser}_${submission.id}_${safeTag}.${extension}`;
+    const fullFilename = `${folderName}/${sanitizeFilename(submission.user || username)}_${submission.id}_${sanitizeFilename(submission.tags?.split(',')[0] || 'content')}.${extension}`;
     
-    console.log(`Downloading: ${fullFilename} from ${downloadUrl}`);
+    console.log(`Downloading: ${fullFilename}`);
     
     // Use Chrome's downloads API with folder structure
     return new Promise((resolve, reject) => {
@@ -215,7 +146,6 @@ async function downloadFileToFolder(submission, contentType, folderName, usernam
             conflictAction: 'uniquify' // Add number if file exists
         }, (downloadId) => {
             if (chrome.runtime.lastError) {
-                console.error(`Download failed for ${fullFilename}:`, chrome.runtime.lastError);
                 reject(new Error(chrome.runtime.lastError.message));
             } else {
                 console.log(`Started download: ${downloadId} - ${fullFilename}`);
@@ -231,13 +161,14 @@ function getDownloadInfo(submission, contentType) {
             return {
                 downloadUrl: submission.largeImageURL || submission.fullHDURL || submission.webformatURL,
                 filename: `image_${submission.id}`,
-                extension: getExtensionFromUrl(submission.largeImageURL || submission.webformatURL) || 'jpg'
+                extension: 'jpg'
             };
             
         case 'music':
-            // For music, we'll download the preview or use webformat as fallback
+            // Note: Pixabay API doesn't always provide direct download URLs for music
+            // This would need to be handled differently, possibly through web scraping
             return {
-                downloadUrl: submission.previewURL || submission.webformatURL,
+                downloadUrl: submission.download_url || submission.webformatURL,
                 filename: `audio_${submission.id}`,
                 extension: 'mp3'
             };
@@ -245,8 +176,7 @@ function getDownloadInfo(submission, contentType) {
         case 'video':
             const videoUrl = submission.videos?.large?.url || 
                            submission.videos?.medium?.url || 
-                           submission.videos?.small?.url ||
-                           submission.videos?.tiny?.url;
+                           submission.videos?.small?.url;
             return {
                 downloadUrl: videoUrl,
                 filename: `video_${submission.id}`,
@@ -264,19 +194,9 @@ function getDownloadInfo(submission, contentType) {
 
 function getExtensionFromUrl(url) {
     if (!url) return 'jpg';
-    try {
-        const pathname = new URL(url).pathname;
-        const extension = pathname.split('.').pop()?.toLowerCase();
-        return extension || 'jpg';
-    } catch {
-        return 'jpg';
-    }
-}
-
-function getFirstTag(tags) {
-    if (!tags) return 'content';
-    const firstTag = tags.split(',')[0]?.trim();
-    return firstTag || 'content';
+    const pathname = new URL(url).pathname;
+    const extension = pathname.split('.').pop();
+    return extension || 'jpg';
 }
 
 function sanitizeFilename(filename) {
@@ -288,22 +208,6 @@ function sanitizeFilename(filename) {
         .replace(/_{2,}/g, '_') // Replace multiple underscores with single
         .toLowerCase()
         .substring(0, 50); // Limit length
-}
-
-function notifyDownloadStarted(tabId, username, contentType) {
-    const message = {
-        action: 'DOWNLOAD_STARTED',
-        username: username,
-        contentType: contentType
-    };
-    
-    // Notify tab content script
-    if (tabId) {
-        chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    }
-    
-    // Notify popup
-    chrome.runtime.sendMessage(message).catch(() => {});
 }
 
 function notifyProgress(tabId, current, total) {
@@ -369,13 +273,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     }
 });
 
-// Clean up request queue periodically
-setInterval(() => {
-    const now = Date.now();
-    const oldLength = requestQueue.length;
-    requestQueue = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW * 60); // Keep for 60 seconds
-    
-    if (requestQueue.length !== oldLength) {
-        console.log(`Cleaned up request queue: ${oldLength} -> ${requestQueue.length}`);
+// Clean up old downloads periodically (optional)
+chrome.alarms.create('cleanup', { periodInMinutes: 60 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'cleanup') {
+        // You could implement cleanup logic here if needed
+        console.log('Periodic cleanup check');
     }
-}, 30000); // Clean every 30 seconds
+});

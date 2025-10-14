@@ -1,4 +1,4 @@
-/* Pixabay-themed styles for the mass downloader interface */
+﻿/* Pixabay-themed styles for the mass downloader interface */
 :root {
     --pixabay-green: #4bc24b;
     --pixabay-green-dark: #3ba93b;
@@ -14,7 +14,7 @@
 }
 
 .pixabay-mass-downloader-container {
-    background: white;
+    background: #ffffff;
     border: 1px solid var(--pixabay-border);
     border-radius: 12px;
     padding: 24px;
@@ -108,16 +108,16 @@
 }
 
 .mass-download-btn[data-type="photo"] {
-    background: linear-gradient(135deg, var(--pixabay-green), var(--pixabay-green-dark));
+    background: linear-gradient(135deg, #007bff, #0056b3);
 }
 
 .mass-download-btn[data-type="photo"]:hover {
-    background: linear-gradient(135deg, var(--pixabay-green-light), var(--pixabay-green));
-    box-shadow: 0 6px 16px rgba(75, 194, 75, 0.3);
+    background: linear-gradient(135deg, #0088ff, #007bff);
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.3);
 }
 
 .mass-download-btn[data-type="music"] {
-    background: linear-gradient(135deg, var(--pixabay-orange), var(--pixabay-orange-light));
+    background: linear-gradient(135deg, var(--pixabay-orange), #e6680b);
 }
 
 .mass-download-btn[data-type="music"]:hover {
@@ -126,17 +126,17 @@
 }
 
 .mass-download-btn[data-type="video"] {
-    background: linear-gradient(135deg, var(--pixabay-gray), var(--pixabay-gray-dark));
+    background: linear-gradient(135deg, #6f42c1, #5a2d8c);
 }
 
 .mass-download-btn[data-type="video"]:hover {
-    background: linear-gradient(135deg, var(--pixabay-gray-light), var(--pixabay-gray));
-    box-shadow: 0 6px 16px rgba(108, 117, 125, 0.3);
+    background: linear-gradient(135deg, #7c4ddd, #6f42c1);
+    box-shadow: 0 6px 16px rgba(111, 66, 193, 0.3);
 }
 
 .api-key-section {
-    background: linear-gradient(135deg, var(--pixabay-gray-light), var(--pixabay-border));
-    border: 1px solid var(--pixabay-border);
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border: 1px solid #f0e5a0;
     border-radius: 8px;
     padding: 20px;
     margin: 16px 0;
@@ -153,7 +153,7 @@
 
 .api-key-section h4 {
     margin: 0 0 12px 32px;
-    color: var(--pixabay-gray-dark);
+    color: #856404;
     font-size: 16px;
     font-weight: 600;
 }
@@ -161,7 +161,7 @@
 .api-key-section input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid var(--pixabay-border);
+    border: 2px solid #f0e5a0;
     border-radius: 6px;
     margin-bottom: 12px;
     font-size: 14px;
@@ -193,7 +193,7 @@
 }
 
 .progress-section {
-    background: linear-gradient(135deg, var(--pixabay-gray-light), var(--pixabay-border));
+    background: linear-gradient(135deg, var(--pixabay-gray-light), #e9ecef);
     border-radius: 8px;
     padding: 20px;
     margin: 16px 0;
@@ -216,7 +216,7 @@
 }
 
 .progress-bar {
-    background: var(--pixabay-border);
+    background: #dee2e6;
     border-radius: 12px;
     height: 24px;
     overflow: hidden;
@@ -263,15 +263,15 @@
 
 /* Success and error states */
 .download-complete {
-    background: linear-gradient(135deg, var(--pixabay-green-light), var(--pixabay-green));
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
     border-color: var(--pixabay-green);
-    color: white;
+    color: #155724;
 }
 
 .download-error {
-    background: linear-gradient(135deg, var(--pixabay-orange-light), var(--pixabay-orange));
-    border-color: var(--pixabay-orange);
-    color: white;
+    background: linear-gradient(135deg, #f8d7da, #f1aeb5);
+    border-color: #dc3545;
+    color: #721c24;
 }
 
 /* Mobile responsiveness */
@@ -300,33 +300,33 @@
     }
 }
 
-/* Dark mode support */
+/* Dark mode support (if Pixabay implements it) */
 @media (prefers-color-scheme: dark) {
     .pixabay-mass-downloader-container {
-        background: var(--pixabay-gray-dark);
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
     }
     
     .mass-download-section h3 {
-        color: var(--pixabay-gray-light);
+        color: #e2e8f0;
     }
     
     .api-key-section {
-        background: linear-gradient(135deg, var(--pixabay-gray-dark), var(--pixabay-gray));
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: linear-gradient(135deg, #2d3748, #1a202c);
+        border-color: #4a5568;
+        color: #e2e8f0;
     }
     
     .api-key-section input {
-        background: var(--pixabay-gray-dark);
-        border-color: var(--pixabay-gray);
-        color: var(--pixabay-gray-light);
+        background: #1a202c;
+        border-color: #4a5568;
+        color: #e2e8f0;
     }
     
     .progress-section {
-        background: linear-gradient(135deg, var(--pixabay-gray-dark), var(--pixabay-gray));
-        border-color: var(--pixabay-gray);
+        background: linear-gradient(135deg, #2d3748, #1a202c);
+        border-color: #4a5568;
     }
 }
 
