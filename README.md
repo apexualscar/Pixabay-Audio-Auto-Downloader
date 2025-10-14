@@ -1,2 +1,252 @@
-# Pixabay-Mass-Audio-Downloader
-a tool to download a users whole sound Library
+# Pixabay Sound Effects Downloader Chrome Extension
+
+A focused Chrome extension that extracts and downloads sound effects from Pixabay pages using advanced DOM selectors - no API key required!
+
+## Features
+
+- **Focused Sound Effects Extraction**: Specifically designed to extract audio content from Pixabay
+- **Advanced DOM Selectors**: Uses precise CSS selectors (`audioRow--nAm4Z`, `nameAndTitle--KcBAZ`, `overlayContainer--0ZpHP`) for accurate content detection
+- **Direct Page Scraping**: Works on any Pixabay page containing sound effects
+- **No API Key Required**: Direct web scraping eliminates API limitations
+- **Real-time Progress**: Live scanning and download progress tracking
+- **Item List View**: Preview all found sound effects before downloading
+- **Pixabay Green Theme**: Matches Pixabay's official branding
+- **Organized Downloads**: Saves files to `pixabay_sound_effects/` folder
+- **User Profile Detection**: Shows user avatar, name, and ID when on profile pages
+
+## Installation
+
+### Chrome Extension Installation
+
+1. **Download or clone this repository**
+2. **Open Chrome and navigate to** `chrome://extensions/`
+3. **Enable "Developer mode"** in the top right corner
+4. **Click "Load unpacked"** and select the project root directory
+5. **The Pixabay Sound Effects Downloader extension** should now appear with a green "PeX" icon
+
+### Alternative: Use the PowerShell Installer
+
+```powershell
+# Run the automated installer
+.\install-extension.ps1
+```
+
+## How to Use
+
+### Step 1: Visit Pixabay
+1. **Navigate to any Pixabay page** that contains sound effects
+   - User profiles: `https://pixabay.com/users/username/sound-effects/`
+   - Search results: `https://pixabay.com/sound-effects/search/nature/`
+   - Category pages: `https://pixabay.com/sound-effects/`
+
+### Step 2: Open the Extension
+1. **Click the green "PeX" icon** in your Chrome toolbar
+2. **The extension will detect** if sound effects are available on the current page
+3. **Status indicator** shows when ready to scan
+4. **User profile info** displayed if on a user's page (avatar, name, ID)
+
+### Step 3: Scan for Sound Effects
+1. **Click "Scan & Download Sound Effects"** button
+2. **Watch the scanning progress** as it finds audio content
+3. **Review the items list** showing all detected sound effects
+4. **File names and IDs** are displayed for each item
+
+### Step 4: Monitor Downloads
+1. **Downloads start automatically** after scanning completes
+2. **Use pause/resume/cancel** controls during download
+3. **Progress bar shows** current download status
+4. **Files are saved** to `Downloads/pixabay_sound_effects/`
+
+## Design Features
+
+### Pixabay Green Branding
+- **Primary Color**: `#4bc24b` (Pixabay Green)
+- **Secondary Colors**: White and gray tones
+- **Consistent Styling**: Matches Pixabay's official design language
+- **Green "PeX" Icon**: Instantly recognizable extension icon
+
+### User Interface
+- **420x650px Popup**: Optimized for Chrome extensions
+- **Clean Layout**: Focused on sound effects extraction
+- **Real-time Feedback**: Live status updates and progress tracking
+- **Item Preview**: See exactly what will be downloaded
+- **User Info Display**: Shows profile picture, name, and user ID
+
+## Technical Details
+
+### Advanced Selector Technology
+```javascript
+// Primary selectors for Pixabay audio content
+const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
+const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+const titleElements = audioRow.querySelector('.nameAndTitle--KcBAZ');
+
+// User profile selectors
+const userAvatar = document.querySelector('.image--vdlQM');
+const userName = document.querySelector('.h1--bZ6EI.L--opXRs');
+```
+
+### Smart Content Detection
+- **Specific CSS Classes**: Targets exact Pixabay audio elements
+- **Multiple Selector Strategies**: Primary and fallback detection methods
+- **Progressive Loading**: Scrolls through pages to load all available content
+- **Title Extraction**: Gets sound effect names from DOM elements
+- **User Profile Recognition**: Extracts user information when available
+
+### Download Management
+- **Chrome Downloads API**: Native browser download integration
+- **Organized Structure**: `pixabay_sound_effects/title_id.mp3` format
+- **Filename Sanitization**: Safe file names for all operating systems
+- **Progress Tracking**: Real-time download status updates
+
+## File Structure
+
+```
+Pixabay Sound Effects Downloader/
+??? manifest.json                 # Extension configuration
+??? content-script.js            # DOM scanning logic
+??? content-styles.css           # Pixabay green styling
+??? background.js                # Download management
+??? popup.html                   # Extension interface
+??? popup.js                     # UI functionality
+??? icon.svg                     # Pixabay green "PeX" icon
+??? EXTENSION_README.md          # This documentation
+```
+
+## Supported Audio Formats
+
+- **Primary Format**: MP3 (most common)
+- **Alternative Formats**: WAV, OGG, AAC, M4A, FLAC
+- **Quality**: Depends on source file quality on Pixabay
+- **File Sizes**: Varies by audio length and quality
+
+## Performance Features
+
+### Efficient Scanning
+- **Smart Scrolling**: Loads all content progressively
+- **Duplicate Detection**: Avoids processing same items multiple times
+- **Rate Limiting**: Respectful delays between operations
+- **Memory Management**: Efficient handling of large audio collections
+
+### Download Optimization
+- **Parallel Processing**: Multiple downloads when possible
+- **Error Resilience**: Continues downloading even if some files fail
+- **Retry Logic**: Attempts to re-download failed items
+- **Progress Persistence**: Maintains progress state during pauses
+
+## Troubleshooting
+
+### Extension Not Working
+- **Check Extension**: Ensure it's enabled in `chrome://extensions/`
+- **Reload Page**: Refresh the Pixabay page after installing
+- **Check Permissions**: Verify the extension has access to Pixabay
+- **Developer Mode**: Ensure developer mode is enabled for unpacked extensions
+
+### No Sound Effects Found
+- **Page Content**: Ensure the page actually contains audio content
+- **Scroll Down**: Some content loads dynamically as you scroll
+- **Try Different Pages**: Test on known sound effects pages
+- **Check Console**: Open Chrome DevTools for detailed error messages
+
+### Download Issues
+- **Storage Space**: Ensure sufficient disk space for downloads
+- **Internet Connection**: Verify stable internet connectivity
+- **Download Permissions**: Check Chrome's download settings
+- **Antivirus Software**: Some security software may block downloads
+
+### Performance Issues
+- **Large Collections**: Use pause/resume for very large collections
+- **Browser Resources**: Close unnecessary tabs during large downloads
+- **Network Speed**: Slower connections may require patience
+- **Page Complexity**: Complex pages may take longer to scan
+
+## Privacy & Security
+
+### Data Protection
+- **No Data Collection**: Extension doesn't collect personal information
+- **Local Processing**: All operations performed locally in your browser
+- **No External Servers**: Direct communication with Pixabay only
+- **Secure Storage**: Uses Chrome's secure storage APIs
+
+### Permissions Explained
+- **activeTab**: Access to current Pixabay tab for content extraction
+- **downloads**: Ability to save sound effects to your computer
+- **storage**: Temporary storage for extension settings
+- **scripting**: Inject scripts to analyze Pixabay page content
+
+## Advanced Usage Tips
+
+### Batch Processing
+1. **Open Multiple Tabs**: Process different Pixabay pages simultaneously
+2. **Use Bookmarks**: Save frequently accessed sound effect pages
+3. **Organize Downloads**: Create subfolders for different audio categories
+4. **Regular Cleanup**: Periodically organize your downloaded sound effects
+
+### Quality Optimization
+1. **Check Source Quality**: Higher quality sources = better downloads
+2. **Verify File Integrity**: Test downloaded audio files before use
+3. **Format Preferences**: MP3 offers best compatibility across devices
+4. **Backup Important Files**: Keep copies of frequently used sound effects
+
+## Development
+
+### Prerequisites
+- .NET 8 SDK
+- Chrome Browser (latest version)
+- Code editor (VS Code, Visual Studio)
+
+### Local Development
+```bash
+# Clone the repository
+git clone <repository-url>
+
+# Navigate to project directory
+cd Pixabay-Mass-Audio-Downloader
+
+# Load extension in Chrome
+# 1. Open chrome://extensions/
+# 2. Enable Developer mode
+# 3. Click "Load unpacked"
+# 4. Select project root directory
+```
+
+### Testing
+1. **Test on Different Pages**: Various Pixabay sound effect pages
+2. **Check All Browsers**: Primarily Chrome, but test Chromium-based browsers
+3. **Verify Downloads**: Ensure audio files play correctly after download
+4. **Performance Testing**: Test with large collections of sound effects
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Disclaimer
+
+This tool is for personal use only. Please:
+- **Respect Pixabay's Terms**: Follow all Pixabay terms of service
+- **Honor Creator Rights**: Respect the rights of audio creators
+- **Check Licenses**: Verify license terms for each downloaded sound effect
+- **Use Responsibly**: Don't overload Pixabay's servers with excessive requests
+
+## Support
+
+If you encounter issues:
+
+1. **Documentation**: Review this README thoroughly
+2. **Console Logs**: Check Chrome DevTools console for errors
+3. **Refresh Extension**: Reload the extension in Chrome
+4. **Report Issues**: Create detailed bug reports with screenshots
+5. **Feature Requests**: Suggest improvements via issues
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Follow the existing code style
+4. Test thoroughly on multiple Pixabay pages
+5. Submit a pull request with clear description
+
+---
+
+**Happy sound hunting on Pixabay!**
