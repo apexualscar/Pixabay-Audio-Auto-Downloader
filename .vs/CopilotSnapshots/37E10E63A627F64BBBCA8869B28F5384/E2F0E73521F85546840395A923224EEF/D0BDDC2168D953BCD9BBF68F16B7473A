@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
@@ -435,26 +435,6 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             }
         }
         
-        // Auto-like ALL sound effects at once if enabled and user is logged in
-        if (autoLikeEnabled && userIsLoggedIn) {
-            console.log('Auto-like enabled and user logged in - liking ALL sound effects at once');
-            try {
-                await chrome.scripting.executeScript({
-                    target: { tabId: tabId },
-                    function: clickAllLikeButtons
-                });
-                console.log('Completed liking all sound effects');
-                
-                // Add delay after bulk liking
-                await sleep(1000);
-                
-            } catch (error) {
-                console.error('Error during bulk auto-like:', error);
-            }
-        } else if (autoLikeEnabled && !userIsLoggedIn) {
-            console.log('Auto-like enabled but user not logged in - skipping like functionality');
-        }
-        
         // Notify that download is starting
         sendMessageToPopup({
             action: 'DOWNLOAD_STARTED',
@@ -481,6 +461,13 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             const soundEffect = soundEffects[i];
             
             try {
+                // Auto-like if enabled AND user is logged in (checked at download time)
+                if (autoLikeEnabled && userIsLoggedIn) {
+                    await autoLikeSoundEffect(soundEffect, tabId);
+                } else if (autoLikeEnabled && !userIsLoggedIn) {
+                    console.log(`Auto-like enabled but user not logged in - skipping like for ${soundEffect.id}`);
+                }
+                
                 await downloadSoundEffect(soundEffect, folderName, tabId);
                 downloadedCount++;
                 
@@ -543,125 +530,6 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
     }
 }
 
-// NEW: Function to click ALL like buttons for ALL sound effects at once
-function clickAllLikeButtons() {
-    try {
-        console.log('Starting bulk auto-like for ALL sound effects');
-        
-        let likedCount = 0;
-        
-        // Method 1: Look for like buttons within likeButtonWrapper elements
-        const likeWrappers = document.querySelectorAll('.likeButtonWrapper--yrNJw');
-        console.log(`Found ${likeWrappers.length} like button wrappers`);
-        
-        likeWrappers.forEach((wrapper, index) => {
-            try {
-                // Find the like button within this wrapper
-                const likeButton = wrapper.querySelector('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
-                if (likeButton) {
-                    console.log(`Clicking like button ${index + 1} in wrapper`);
-                    likeButton.click();
-                    likedCount++;
-                } else {
-                    console.log(`No like button found in wrapper ${index + 1}`);
-                }
-            } catch (error) {
-                console.error(`Error clicking like button in wrapper ${index + 1}:`, error);
-            }
-        });
-        
-        // Method 2: Fallback - find all like buttons and group by containers
-        if (likedCount === 0) {
-            console.log('No wrappers found, using fallback method');
-            
-            const allLikeButtons = document.querySelectorAll('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
-            console.log(`Found ${allLikeButtons.length} total like buttons on page`);
-            
-            // Group buttons by their parent containers to avoid duplicates
-            const containerButtonMap = new Map();
-            
-            allLikeButtons.forEach((button, index) => {
-                try {
-                    // Find the sound effect container
-                    const container = button.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"], .likeButtonWrapper--yrNJw');
-                    
-                    if (container) {
-                        // Only store one button per container (to avoid clicking multiple buttons in same item)
-                        if (!containerButtonMap.has(container)) {
-                            containerButtonMap.set(container, button);
-                        }
-                    } else {
-                        // If no container found, click the button directly
-                        console.log(`Clicking standalone like button ${index + 1}`);
-                        button.click();
-                        likedCount++;
-                    }
-                } catch (error) {
-                    console.error(`Error processing like button ${index + 1}:`, error);
-                }
-            });
-            
-            // Click one button per container
-            containerButtonMap.forEach((button, container) => {
-                try {
-                    console.log(`Clicking like button in container`);
-                    button.click();
-                    likedCount++;
-                } catch (error) {
-                    console.error('Error clicking like button in container:', error);
-                }
-            });
-        }
-        
-        // Method 3: Ultimate fallback - click all heart/like icons
-        if (likedCount === 0) {
-            console.log('Still no likes, trying ultimate fallback');
-            
-            // Look for heart icons or other like indicators
-            const heartSelectors = [
-                '[aria-label*="like"]',
-                '[title*="like"]',
-                '[data-testid*="like"]',
-                '.fa-heart',
-                '.heart-icon',
-                'svg[class*="heart"]',
-                'button[class*="like"]'
-            ];
-            
-            for (const selector of heartSelectors) {
-                try {
-                    const elements = document.querySelectorAll(selector);
-                    console.log(`Found ${elements.length} elements with selector: ${selector}`);
-                    
-                    elements.forEach((element, index) => {
-                        try {
-                            if (element.offsetParent !== null) { // Check if visible
-                                console.log(`Clicking heart/like element ${index + 1} with selector ${selector}`);
-                                element.click();
-                                likedCount++;
-                            }
-                        } catch (error) {
-                            console.error(`Error clicking heart element ${index + 1}:`, error);
-                        }
-                    });
-                    
-                    if (likedCount > 0) break; // Stop if we found some likes
-                } catch (error) {
-                    console.error(`Error with selector ${selector}:`, error);
-                }
-            }
-        }
-        
-        console.log(`Bulk auto-like completed: ${likedCount} sound effects liked`);
-        return likedCount;
-        
-    } catch (error) {
-        console.error('Error in bulk auto-like:', error);
-        return 0;
-    }
-}
-
-// Legacy function kept for backward compatibility (no longer used)
 async function autoLikeSoundEffect(soundEffect, tabId) {
     try {
         console.log(`Auto-liking sound effect: ${soundEffect.id}`);
@@ -680,7 +548,7 @@ async function autoLikeSoundEffect(soundEffect, tabId) {
     }
 }
 
-// Legacy function kept for backward compatibility (no longer used)
+// FIXED: Function to be injected to click the CORRECT like button (second instance)
 function clickLikeButton(soundEffectId) {
     try {
         console.log(`Looking for like button for sound effect: ${soundEffectId}`);

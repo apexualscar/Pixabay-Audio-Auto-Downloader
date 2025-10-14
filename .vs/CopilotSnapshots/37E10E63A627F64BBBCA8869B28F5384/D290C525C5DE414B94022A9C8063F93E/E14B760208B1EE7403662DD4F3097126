@@ -1,4 +1,4 @@
-// Popup script for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Popup script for Pixabay Sound Effects Downloader - Focused Audio Extraction
 let currentUsername = null;
 let currentUserInfo = null;
 let isScanning = false;
@@ -11,10 +11,7 @@ document.addEventListener('DOMContentLoaded', initializePopup);
 
 async function initializePopup() {
     try {
-        // Get persisted state first
-        await restoreExtensionState();
-        
-        // Quick status check
+        // Quick status check first
         await updateStatus();
         
         // Check current page - no API key needed for scraping
@@ -29,70 +26,6 @@ async function initializePopup() {
     } catch (error) {
         console.error('Error initializing popup:', error);
         updateStatusMessage('X', 'Error loading extension', 'error');
-    }
-}
-
-async function restoreExtensionState() {
-    try {
-        const response = await chrome.runtime.sendMessage({ action: 'GET_EXTENSION_STATE' });
-        if (response && response.state) {
-            const state = response.state;
-            console.log('Restoring extension state:', state);
-            
-            // Restore variables
-            isScanning = state.isScanning || false;
-            isDownloading = state.isDownloading || false;
-            isPaused = state.isPaused || false;
-            scannedItems = state.scannedItems || [];
-            
-            // Restore UI state
-            if (state.lastStatus) {
-                updateStatusMessage(state.lastStatus.icon, state.lastStatus.message, state.lastStatus.type);
-            }
-            
-            // Restore scan button state
-            if (isScanning) {
-                const scanBtn = document.getElementById('scanBtn');
-                scanBtn.innerHTML = '<div class="spinner"></div> Scanning for sound effects...';
-                scanBtn.disabled = true;
-            }
-            
-            // Restore scanned items if any
-            if (scannedItems.length > 0) {
-                showItemsList(scannedItems);
-                showDownloadSection();
-                document.getElementById('soundEffectsCount').textContent = scannedItems.length;
-            }
-            
-            // Restore download state
-            if (isDownloading) {
-                showDownloadSection();
-                showProgress();
-                showDownloadControls();
-                
-                const downloadBtn = document.getElementById('downloadBtn');
-                downloadBtn.innerHTML = '<div class="spinner"></div> Downloading...';
-                downloadBtn.disabled = true;
-                
-                // Restore progress if available
-                if (state.currentProgress) {
-                    updateProgress(state.currentProgress.current, state.currentProgress.total);
-                }
-                
-                // Restore pause/resume button states
-                if (isPaused) {
-                    document.getElementById('pauseBtn').disabled = true;
-                    document.getElementById('resumeBtn').disabled = false;
-                } else {
-                    document.getElementById('pauseBtn').disabled = false;
-                    document.getElementById('resumeBtn').disabled = true;
-                }
-            }
-            
-            console.log('Extension state restored successfully');
-        }
-    } catch (error) {
-        console.error('Error restoring extension state:', error);
     }
 }
 
@@ -125,11 +58,7 @@ function setupEventListeners() {
 }
 
 async function updateStatus() {
-    // Only update if not already set from restored state
-    const currentMessage = document.getElementById('statusMessage').textContent;
-    if (!currentMessage || currentMessage === 'Checking current page...') {
-        updateStatusMessage('...', 'Checking status...', '');
-    }
+    updateStatusMessage('...', 'Checking status...', '');
 }
 
 async function checkCurrentPage() {
@@ -156,15 +85,11 @@ async function checkCurrentPage() {
                 }
             }
             
-            // Always show scan section on Pixabay pages (unless already in a process)
-            if (!isScanning && !isDownloading) {
-                showScanSection();
-                updateStatusMessage('Check', 'Ready to scan sound effects from current page', 'success');
-            }
+            // Always show scan section on Pixabay pages
+            showScanSection();
+            updateStatusMessage('Check', 'Ready to scan sound effects from current page', 'success');
         } else {
-            if (!isScanning && !isDownloading) {
-                updateStatusMessage('!', 'Visit a Pixabay page to scan for sound effects', 'warning');
-            }
+            updateStatusMessage('!', 'Visit a Pixabay page to scan for sound effects', 'warning');
         }
         
     } catch (error) {
@@ -444,17 +369,9 @@ function followUser() {
 }
 
 async function refreshData() {
-    // Reset all states
-    isScanning = false;
-    isDownloading = false;
-    isPaused = false;
-    
     clearScannedItems();
     hideDownloadSection();
     resetScanButton();
-    hideProgress();
-    hideDownloadControls();
-    
     await checkCurrentPage();
 }
 

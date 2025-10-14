@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -168,7 +168,7 @@
             background: var(--pixabay-green-dark);
         }
 
-        /* Auto-like Toggle - Always visible and enabled */
+        /* Auto-like Toggle - Always visible */
         .auto-like-section {
             background: white;
             border: 1px solid var(--pixabay-border);
@@ -240,10 +240,9 @@
             transform: translateX(20px);
         }
 
-        /* Remove disabled styling since toggle is always enabled */
         .toggle-input:disabled+.toggle-slider {
-            opacity: 1;
-            cursor: pointer;
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         /* Status Section */
@@ -635,12 +634,12 @@
             </div>
         </div>
 
-        <!-- Auto-like Toggle - Always visible and enabled between target and status -->
+        <!-- Auto-like Toggle - Always visible between target and status -->
         <div class="auto-like-section" id="autoLikeSection">
             <div class="auto-like-toggle">
                 <div>
                     <div class="auto-like-label">Auto-like Sound Effects</div>
-                    <div class="auto-like-description">Automatically like each sound effect during download (requires login)</div>
+                    <div class="auto-like-description">Automatically like each sound effect during download</div>
                 </div>
                 <label class="toggle-switch">
                     <input type="checkbox" class="toggle-input" id="autoLikeToggle">
