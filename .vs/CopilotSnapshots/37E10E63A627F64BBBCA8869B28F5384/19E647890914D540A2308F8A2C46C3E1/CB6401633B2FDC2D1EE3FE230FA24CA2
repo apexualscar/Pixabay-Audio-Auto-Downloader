@@ -1,4 +1,4 @@
-// Content script for Pixabay Mass Downloader - Web Scraping Version
+﻿// Content script for Pixabay Mass Downloader - Web Scraping Version
 console.log('Pixabay Mass Downloader content script loaded');
 
 let isContentScriptActive = false;
@@ -42,7 +42,7 @@ function addScrapingIndicators() {
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         ">
-            ?? Scraper Ready
+            🎵 Scraper Ready
         </div>
     `;
     

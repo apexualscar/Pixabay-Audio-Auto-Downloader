@@ -7,34 +7,34 @@
         <div class="col-lg-8 mx-auto">
             <div class="text-center mb-5">
                 <h1 class="display-4 text-primary">🎵 Pixabay Mass Downloader</h1>
-                <p class="lead text-muted">Web scraper to download ALL content types from any Pixabay user - No API key required!</p>
+                <p class="lead text-muted">Download all submissions from any Pixabay user with one click</p>
             </div>
 
             <div class="row mb-4">
                 <div class="col-md-4 mb-3">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body text-center">
-                            <i class="fas fa-search fa-3x text-primary mb-3"></i>
-                            <h5>Web Scraper</h5>
-                            <p class="text-muted">Advanced web scraping technology to download all content types including music and sound effects</p>
+                            <i class="fas fa-download fa-3x text-primary mb-3"></i>
+                            <h5>Mass Download</h5>
+                            <p class="text-muted">Download all images, sounds, or videos from any Pixabay user profile in bulk</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body text-center">
-                            <i class="fas fa-layer-group fa-3x text-success mb-3"></i>
-                            <h5>All Content Types</h5>
-                            <p class="text-muted">Photos, Illustrations, Vectors, Videos, Music, Sound Effects, GIFs - everything in one tool</p>
+                            <i class="fas fa-shield-alt fa-3x text-success mb-3"></i>
+                            <h5>Secure API</h5>
+                            <p class="text-muted">Your Pixabay API key is stored securely and only used for legitimate downloads</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
                     <div class="card h-100 shadow-sm">
                         <div class="card-body text-center">
-                            <i class="fas fa-key-modern fa-3x text-warning mb-3"></i>
-                            <h5>No API Key Needed</h5>
-                            <p class="text-muted">Works directly with Pixabay's website - no API limitations or registration required</p>
+                            <i class="fas fa-chrome fa-3x text-warning mb-3"></i>
+                            <h5>Chrome Extension</h5>
+                            <p class="text-muted">Works as a Chrome extension, adding download buttons directly to Pixabay user profiles</p>
                         </div>
                     </div>
                 </div>
@@ -48,36 +48,36 @@
                     <ol class="list-group list-group-numbered list-group-flush">
                         <li class="list-group-item d-flex justify-content-between align-items-start">
                             <div class="ms-2 me-auto">
+                                <div class="fw-bold">Get Your API Key</div>
+                                Visit <a href="https://pixabay.com/api/docs/" target="_blank" class="text-decoration-none">Pixabay API Documentation</a> and create a free account to get your API key.
+                            </div>
+                            <span class="badge bg-primary rounded-pill">1</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
                                 <div class="fw-bold">Install Chrome Extension</div>
                                 Load the extension files into Chrome's developer mode or install from the Chrome Web Store.
                             </div>
-                            <span class="badge bg-primary rounded-pill">1</span>
+                            <span class="badge bg-primary rounded-pill">2</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="ms-2 me-auto">
+                                <div class="fw-bold">Configure API Key</div>
+                                Enter your API key in the extension popup or use the <a href="/downloader" class="text-decoration-none">Mass Downloader</a> page.
+                            </div>
+                            <span class="badge bg-primary rounded-pill">3</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-start">
                             <div class="ms-2 me-auto">
                                 <div class="fw-bold">Visit Pixabay User Profile</div>
                                 Navigate to any user's profile page on Pixabay (e.g., pixabay.com/users/username/).
                             </div>
-                            <span class="badge bg-primary rounded-pill">2</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-start">
-                            <div class="ms-2 me-auto">
-                                <div class="fw-bold">Open Extension Popup</div>
-                                Click the extension icon in your Chrome toolbar to open the scraper interface.
-                            </div>
-                            <span class="badge bg-primary rounded-pill">3</span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-start">
-                            <div class="ms-2 me-auto">
-                                <div class="fw-bold">Choose Content Category</div>
-                                Select which type of content to download: Photos, Illustrations, Vectors, Videos, Music, Sound Effects, or GIFs.
-                            </div>
                             <span class="badge bg-primary rounded-pill">4</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-start">
                             <div class="ms-2 me-auto">
                                 <div class="fw-bold">Start Downloading</div>
-                                Click the category button and watch as all content is automatically downloaded to organized folders.
+                                Click the download buttons that appear on the user's profile to download all their content of the selected type.
                             </div>
                             <span class="badge bg-primary rounded-pill">5</span>
                         </li>
@@ -89,17 +89,16 @@
                 <div class="col-md-6 mb-3">
                     <div class="card border-success">
                         <div class="card-header bg-success text-white">
-                            <h5 class="mb-0">✅ Supported Content Types</h5>
+                            <h5 class="mb-0">✅ Features</h5>
                         </div>
                         <div class="card-body">
                             <ul class="list-unstyled mb-0">
-                                <li><i class="fas fa-camera text-success me-2"></i>📷 Photos</li>
-                                <li><i class="fas fa-palette text-success me-2"></i>🎨 Illustrations</li>
-                                <li><i class="fas fa-vector-square text-success me-2"></i>📐 Vectors</li>
-                                <li><i class="fas fa-video text-success me-2"></i>🎬 Videos</li>
-                                <li><i class="fas fa-music text-success me-2"></i>🎵 Music</li>
-                                <li><i class="fas fa-volume-up text-success me-2"></i>🔊 Sound Effects</li>
-                                <li><i class="fas fa-images text-success me-2"></i>🎞️ GIFs</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Download all user images</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Download all user sounds/music</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Download all user videos</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Progress tracking</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Secure API key storage</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Preview before download</li>
                             </ul>
                         </div>
                     </div>
@@ -107,38 +106,28 @@
                 <div class="col-md-6 mb-3">
                     <div class="card border-info">
                         <div class="card-header bg-info text-white">
-                            <h5 class="mb-0">📋 Features</h5>
+                            <h5 class="mb-0">📋 Requirements</h5>
                         </div>
                         <div class="card-body">
                             <ul class="list-unstyled mb-0">
-                                <li><i class="fas fa-bolt text-info me-2"></i>No API key required</li>
-                                <li><i class="fas fa-folder text-info me-2"></i>Organized folder structure</li>
-                                <li><i class="fas fa-pause-circle text-info me-2"></i>Pause & resume downloads</li>
-                                <li><i class="fas fa-chart-line text-info me-2"></i>Real-time progress tracking</li>
-                                <li><i class="fas fa-user-check text-info me-2"></i>User verification with profile pics</li>
-                                <li><i class="fas fa-shield-alt text-info me-2"></i>Respectful scraping with delays</li>
+                                <li><i class="fas fa-info-circle text-info me-2"></i>Google Chrome browser</li>
+                                <li><i class="fas fa-info-circle text-info me-2"></i>Free Pixabay API key</li>
+                                <li><i class="fas fa-info-circle text-info me-2"></i>Internet connection</li>
+                                <li><i class="fas fa-info-circle text-info me-2"></i>Sufficient storage space</li>
                             </ul>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="alert alert-success mb-4">
-                <h5 class="alert-heading">🎉 Web Scraper Advantages</h5>
-                <p class="mb-0">
-                    <strong>Unlike API-based tools</strong>, our web scraper can download ALL content types including music and sound effects 
-                    that aren't available through Pixabay's API. No registration, no rate limits, no API key management - just pure downloading power!
-                </p>
-            </div>
-
             <div class="text-center mt-4">
                 <a href="/downloader" class="btn btn-primary btn-lg me-3">
                     <i class="fas fa-download me-2"></i>
-                    Start Using Scraper
+                    Start Using Downloader
                 </a>
-                <a href="https://pixabay.com" target="_blank" class="btn btn-outline-secondary btn-lg">
+                <a href="https://pixabay.com/api/docs/" target="_blank" class="btn btn-outline-secondary btn-lg">
                     <i class="fas fa-external-link-alt me-2"></i>
-                    Visit Pixabay
+                    Get API Key
                 </a>
             </div>
         </div>

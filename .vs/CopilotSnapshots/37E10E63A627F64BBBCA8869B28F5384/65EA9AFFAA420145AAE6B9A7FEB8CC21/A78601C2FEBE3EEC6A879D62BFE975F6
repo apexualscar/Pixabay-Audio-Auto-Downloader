@@ -1,0 +1,563 @@
+﻿// Background service worker for the Chrome extension
+console.log('Pixabay Mass Downloader background script loaded');
+
+// Rate limiting variables
+const API_RATE_LIMIT = 60; // requests per second
+const RATE_LIMIT_WINDOW = 1000; // 1 second in milliseconds
+let requestQueue = [];
+let isProcessingQueue = false;
+
+// Download control variables
+let isDownloadPaused = false;
+let isDownloadCanceled = false;
+let currentDownloadSession = null;
+
+// Listen for messages from popup and content scripts
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch (message.action) {
+        case 'START_DOWNLOAD':
+            handleDownloadRequest(message, sender.tab?.id || null);
+            sendResponse({ success: true });
+            break;
+        case 'PAUSE_DOWNLOAD':
+            pauseDownload();
+            sendResponse({ success: true });
+            break;
+        case 'RESUME_DOWNLOAD':
+            resumeDownload();
+            sendResponse({ success: true });
+            break;
+        case 'CANCEL_DOWNLOAD':
+            cancelDownload();
+            sendResponse({ success: true });
+            break;
+        case 'GET_USER_INFO':
+            getUserInfo(message.username, message.apiKey, sender.tab?.id || null);
+            sendResponse({ success: true });
+            break;
+    }
+    return true; // Keep message channel open for async response
+});
+
+async function getUserInfo(username, apiKey, tabId) {
+    try {
+        console.log(`Getting user info for: ${username}`);
+        
+        // First, get user's basic info and avatar
+        const userInfoUrl = `https://pixabay.com/api/?key=${apiKey}&username=${encodeURIComponent(username)}&per_page=1`;
+        const response = await fetch(userInfoUrl);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.hits && data.hits.length > 0) {
+                const userSubmission = data.hits[0];
+                const userInfo = {
+                    username: username,
+                    userImageURL: userSubmission.userImageURL || '',
+                    userId: userSubmission.user_id || '',
+                    profileUrl: `https://pixabay.com/users/${encodeURIComponent(username)}/`
+                };
+                
+                // Send user info to popup
+                chrome.runtime.sendMessage({
+                    action: 'USER_INFO_RECEIVED',
+                    userInfo: userInfo
+                }).catch(() => {});
+                
+                console.log('User info retrieved:', userInfo);
+            } else {
+                console.log('No submissions found for user, sending basic info');
+                chrome.runtime.sendMessage({
+                    action: 'USER_INFO_RECEIVED',
+                    userInfo: {
+                        username: username,
+                        userImageURL: '',
+                        userId: '',
+                        profileUrl: `https://pixabay.com/users/${encodeURIComponent(username)}/`
+                    }
+                }).catch(() => {});
+            }
+        }
+    } catch (error) {
+        console.error('Error getting user info:', error);
+    }
+}
+
+function pauseDownload() {
+    isDownloadPaused = true;
+    console.log('Download paused');
+    notifyDownloadPaused();
+}
+
+function resumeDownload() {
+    isDownloadPaused = false;
+    console.log('Download resumed');
+    notifyDownloadResumed();
+}
+
+function cancelDownload() {
+    isDownloadCanceled = true;
+    isDownloadPaused = false;
+    console.log('Download canceled');
+    notifyDownloadCanceled();
+}
+
+async function handleDownloadRequest(request, tabId) {
+    const { username, contentType, apiKey } = request;
+    
+    // Reset download control flags
+    isDownloadPaused = false;
+    isDownloadCanceled = false;
+    currentDownloadSession = Date.now();
+    
+    try {
+        console.log(`Starting download for user: ${username}, type: ${contentType}`);
+        
+        // Notify that download is starting
+        notifyDownloadStarted(tabId, username, contentType);
+        
+        // Get user info first
+        await getUserInfo(username, apiKey, tabId);
+        
+        // Get user's submissions from Pixabay API with proper filtering
+        const submissions = await fetchUserSubmissionsWithRateLimit(username, contentType, apiKey);
+        
+        if (submissions.length === 0) {
+            const errorMsg = `No ${contentType} submissions found for user ${username}`;
+            notifyError(tabId, errorMsg);
+            return;
+        }
+        
+        console.log(`Found ${submissions.length} ${contentType} submissions for ${username}`);
+        
+        // Download each submission with proper folder structure
+        let downloadedCount = 0;
+        const totalCount = submissions.length;
+        
+        // Create folder name: username_contenttype (e.g., "john_doe_music")
+        const folderName = `${sanitizeFilename(username)}_${contentType}`;
+        
+        for (let i = 0; i < submissions.length; i++) {
+            // Check for cancel/pause
+            if (isDownloadCanceled) {
+                console.log('Download canceled by user');
+                break;
+            }
+            
+            while (isDownloadPaused) {
+                await sleep(500); // Check every 500ms if pause is released
+                if (isDownloadCanceled) break;
+            }
+            
+            if (isDownloadCanceled) break;
+            
+            const submission = submissions[i];
+            
+            try {
+                await downloadFileToFolder(submission, contentType, folderName, username);
+                downloadedCount++;
+                
+                // Update progress
+                notifyProgress(tabId, downloadedCount, totalCount);
+                
+                // Add delay to avoid overwhelming the download system
+                await sleep(200);
+                
+            } catch (error) {
+                console.error(`Failed to download ${submission.id}:`, error);
+                // Continue with next file even if one fails
+            }
+        }
+        
+        // Notify completion or cancellation
+        if (isDownloadCanceled) {
+            notifyDownloadCanceled(tabId, downloadedCount);
+        } else {
+            notifyComplete(tabId, downloadedCount);
+        }
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        notifyError(tabId, error.message);
+    }
+}
+
+async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) {
+    const submissions = [];
+    let page = 1;
+    const perPage = 200; // Maximum allowed by Pixabay API
+    
+    // Different API endpoints for different content types
+    const apiEndpoints = {
+        'photo': 'https://pixabay.com/api/',
+        'music': 'https://pixabay.com/api/', // Note: Music might not be available via API
+        'video': 'https://pixabay.com/api/videos/'
+    };
+    
+    const baseUrl = apiEndpoints[contentType] || apiEndpoints['photo'];
+    
+    try {
+        while (true) {
+            // Check for cancellation
+            if (isDownloadCanceled) {
+                console.log('Fetch canceled by user');
+                break;
+            }
+            
+            // Construct API URL with proper parameters for user-specific content
+            const params = new URLSearchParams({
+                key: apiKey,
+                username: username, // This is crucial - filter by username
+                per_page: perPage,
+                page: page,
+                safesearch: 'true',
+                order: 'latest'
+            });
+            
+            // Content type specific parameters
+            if (contentType === 'photo') {
+                params.set('category', 'all');
+                params.set('image_type', 'all');
+            } else if (contentType === 'video') {
+                params.set('category', 'all');
+                params.set('video_type', 'all');
+            }
+            // Note: Music/audio content might not be available through Pixabay API
+            // You might need to handle this differently or inform users
+            
+            const url = `${baseUrl}?${params.toString()}`;
+            
+            console.log(`Fetching page ${page} for ${username} (${contentType}): ${url}`);
+            
+            // Use rate-limited request
+            const response = await makeRateLimitedRequest(url);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`API request failed for page ${page}:`, response.status, errorText);
+                
+                // If it's a page out of range error, we've reached the end
+                if (response.status === 400 && errorText.includes('page')) {
+                    console.log(`Reached end of results at page ${page}`);
+                    break;
+                }
+                
+                throw new Error(`API request failed: ${response.status} - ${errorText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Check if we have any results
+            if (!data.hits || data.hits.length === 0) {
+                console.log(`No more results found at page ${page}`);
+                break; // No more results
+            }
+            
+            // Filter results to ensure they're from the correct user
+            const userSubmissions = data.hits.filter(hit => 
+                hit.user && hit.user.toLowerCase() === username.toLowerCase()
+            );
+            
+            console.log(`Page ${page}: Found ${data.hits.length} submissions, ${userSubmissions.length} from ${username}`);
+            
+            submissions.push(...userSubmissions);
+            
+            // If we got less than perPage results, we've reached the end
+            if (data.hits.length < perPage) {
+                console.log(`Got fewer results than requested (${data.hits.length} < ${perPage}), reached end`);
+                break;
+            }
+            
+            // Check if we've reached the maximum pages
+            if (page >= 50) {
+                console.log(`Reached maximum page limit (${page}), stopping`);
+                break;
+            }
+            
+            page++;
+            
+            // Respect API rate limits - add delay between requests
+            await sleep(1000); // 1 second delay between pages
+        }
+        
+        console.log(`Finished fetching: found ${submissions.length} total ${contentType} submissions for ${username}`);
+        return submissions;
+        
+    } catch (error) {
+        console.error('Error fetching submissions:', error);
+        throw error;
+    }
+}
+
+async function makeRateLimitedRequest(url) {
+    return new Promise((resolve, reject) => {
+        const requestTime = Date.now();
+        
+        // Add request to queue
+        requestQueue.push({
+            url,
+            timestamp: requestTime,
+            resolve,
+            reject
+        });
+        
+        // Process queue if not already processing
+        if (!isProcessingQueue) {
+            processRequestQueue();
+        }
+    });
+}
+
+async function processRequestQueue() {
+    isProcessingQueue = true;
+    
+    while (requestQueue.length > 0) {
+        const now = Date.now();
+        
+        // Remove requests older than rate limit window
+        requestQueue = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW * 10);
+        
+        // Check if we can make a request (stay under rate limit)
+        const recentRequests = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW);
+        
+        if (recentRequests.length >= API_RATE_LIMIT) {
+            // Wait before processing more requests
+            await sleep(100);
+            continue;
+        }
+        
+        // Get next request
+        const request = requestQueue.shift();
+        if (!request) continue;
+        
+        try {
+            console.log(`Making API request: ${request.url}`);
+            const response = await fetch(request.url);
+            request.resolve(response);
+        } catch (error) {
+            console.error(`Request failed: ${error.message}`);
+            request.reject(error);
+        }
+        
+        // Small delay between requests
+        await sleep(50);
+    }
+    
+    isProcessingQueue = false;
+}
+
+async function downloadFileToFolder(submission, contentType, folderName, username) {
+    // Determine the best download URL and filename based on content type
+    const { downloadUrl, filename, extension } = getDownloadInfo(submission, contentType);
+    
+    if (!downloadUrl) {
+        throw new Error('No download URL available for this submission');
+    }
+    
+    // Create full filename with proper extension
+    const safeUser = sanitizeFilename(submission.user || username);
+    const safeTag = sanitizeFilename(getFirstTag(submission.tags) || 'content');
+    const fullFilename = `${folderName}/${safeUser}_${submission.id}_${safeTag}.${extension}`;
+    
+    console.log(`Downloading: ${fullFilename} from ${downloadUrl}`);
+    
+    // Use Chrome's downloads API with folder structure
+    return new Promise((resolve, reject) => {
+        chrome.downloads.download({
+            url: downloadUrl,
+            filename: fullFilename,
+            saveAs: false,
+            conflictAction: 'uniquify' // Add number if file exists
+        }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+                console.error(`Download failed for ${fullFilename}:`, chrome.runtime.lastError);
+                reject(new Error(chrome.runtime.lastError.message));
+            } else {
+                console.log(`Started download: ${downloadId} - ${fullFilename}`);
+                resolve(downloadId);
+            }
+        });
+    });
+}
+
+function getDownloadInfo(submission, contentType) {
+    switch (contentType.toLowerCase()) {
+        case 'photo':
+            return {
+                downloadUrl: submission.largeImageURL || submission.fullHDURL || submission.webformatURL,
+                filename: `image_${submission.id}`,
+                extension: getExtensionFromUrl(submission.largeImageURL || submission.webformatURL) || 'jpg'
+            };
+            
+        case 'music':
+            // Note: Pixabay API doesn't provide direct music file downloads
+            // This would typically download preview images of music tracks
+            console.warn('Music files not directly available through Pixabay API - downloading preview image');
+            return {
+                downloadUrl: submission.previewURL || submission.webformatURL,
+                filename: `music_preview_${submission.id}`,
+                extension: 'jpg'
+            };
+            
+        case 'video':
+            const videoUrl = submission.videos?.large?.url || 
+                           submission.videos?.medium?.url || 
+                           submission.videos?.small?.url ||
+                           submission.videos?.tiny?.url;
+            return {
+                downloadUrl: videoUrl,
+                filename: `video_${submission.id}`,
+                extension: 'mp4'
+            };
+            
+        default:
+            return {
+                downloadUrl: submission.largeImageURL || submission.webformatURL,
+                filename: `content_${submission.id}`,
+                extension: getExtensionFromUrl(submission.webformatURL) || 'jpg'
+            };
+    }
+}
+
+function getExtensionFromUrl(url) {
+    if (!url) return 'jpg';
+    try {
+        const pathname = new URL(url).pathname;
+        const extension = pathname.split('.').pop()?.toLowerCase();
+        return extension || 'jpg';
+    } catch {
+        return 'jpg';
+    }
+}
+
+function getFirstTag(tags) {
+    if (!tags) return 'content';
+    const firstTag = tags.split(',')[0]?.trim();
+    return firstTag || 'content';
+}
+
+function sanitizeFilename(filename) {
+    if (!filename) return 'unknown';
+    // Remove or replace characters that are not allowed in filenames
+    return filename
+        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_') // Replace invalid chars with underscore
+        .replace(/\s+/g, '_') // Replace spaces with underscore
+        .replace(/_{2,}/g, '_') // Replace multiple underscores with single
+        .toLowerCase()
+        .substring(0, 50); // Limit length
+}
+
+function notifyDownloadStarted(tabId, username, contentType) {
+    const message = {
+        action: 'DOWNLOAD_STARTED',
+        username: username,
+        contentType: contentType
+    };
+    
+    // Notify tab content script
+    if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    }
+    
+    // Notify popup
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyProgress(tabId, current, total) {
+    const message = {
+        action: 'UPDATE_PROGRESS',
+        current: current,
+        total: total
+    };
+    
+    // Notify tab content script
+    if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    }
+    
+    // Notify popup
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyComplete(tabId, count) {
+    const message = {
+        action: 'DOWNLOAD_COMPLETE',
+        count: count
+    };
+    
+    // Notify tab content script
+    if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    }
+    
+    // Notify popup
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadPaused() {
+    const message = { action: 'DOWNLOAD_PAUSED' };
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadResumed() {
+    const message = { action: 'DOWNLOAD_RESUMED' };
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadCanceled(tabId, count) {
+    const message = {
+        action: 'DOWNLOAD_CANCELED',
+        count: count || 0
+    };
+    
+    // Notify tab content script
+    if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    }
+    
+    // Notify popup
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyError(tabId, error) {
+    const message = {
+        action: 'DOWNLOAD_ERROR',
+        error: error
+    };
+    
+    // Notify tab content script
+    if (tabId) {
+        chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    }
+    
+    // Notify popup
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Handle extension installation
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        console.log('Pixabay Mass Downloader installed');
+        
+        // Set default storage
+        chrome.storage.local.set({
+            'firstInstall': true,
+            'installDate': new Date().toISOString()
+        });
+    }
+});
+
+// Clean up request queue periodically
+setInterval(() => {
+    const now = Date.now();
+    const oldLength = requestQueue.length;
+    requestQueue = requestQueue.filter(req => now - req.timestamp < RATE_LIMIT_WINDOW * 60); // Keep for 60 seconds
+    
+    if (requestQueue.length !== oldLength) {
+        console.log(`Cleaned up request queue: ${oldLength} -> ${requestQueue.length}`);
+    }
+}, 30000); // Clean every 30 seconds

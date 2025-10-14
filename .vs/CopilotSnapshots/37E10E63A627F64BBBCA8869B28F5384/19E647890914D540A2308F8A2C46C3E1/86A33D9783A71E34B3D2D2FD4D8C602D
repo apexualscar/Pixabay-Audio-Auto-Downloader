@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Mass Downloader - Web Scraping Version
+﻿// Background service worker for Pixabay Mass Downloader - Web Scraping Version
 console.log('Pixabay Mass Downloader (Web Scraper) background script loaded');
 
 // Download control variables

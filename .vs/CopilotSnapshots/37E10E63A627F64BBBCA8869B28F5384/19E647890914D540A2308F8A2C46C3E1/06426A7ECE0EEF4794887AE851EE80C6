@@ -1,4 +1,4 @@
-// Popup script for Pixabay Mass Downloader - Web Scraping Version
+﻿// Popup script for Pixabay Mass Downloader - Web Scraping Version
 let currentUsername = null;
 let currentUserInfo = null;
 let isDownloading = false;
@@ -20,7 +20,7 @@ async function initializePopup() {
         
     } catch (error) {
         console.error('Error initializing popup:', error);
-        updateStatusMessage('?', 'Error loading extension', 'error');
+        updateStatusMessage('❌', 'Error loading extension', 'error');
     }
 }
 
@@ -50,7 +50,7 @@ function setupEventListeners() {
 }
 
 async function updateStatus() {
-    updateStatusMessage('?', 'Checking status...', '');
+    updateStatusMessage('⏳', 'Checking status...', '');
 }
 
 async function checkCurrentPage() {
@@ -58,7 +58,7 @@ async function checkCurrentPage() {
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
         if (!activeTab || !activeTab.url) {
-            updateStatusMessage('??', 'No active tab detected', 'warning');
+            updateStatusMessage('ℹ️', 'No active tab detected', 'warning');
             return;
         }
         
@@ -74,19 +74,19 @@ async function checkCurrentPage() {
                 });
                 
                 showDownloadSection(currentUsername);
-                updateStatusMessage('?', `Ready to scrape content from: ${currentUsername}`, 'success');
+                updateStatusMessage('✅', `Ready to scrape content from: ${currentUsername}`, 'success');
             } else {
-                updateStatusMessage('??', 'Unable to detect username', 'warning');
+                updateStatusMessage('⚠️', 'Unable to detect username', 'warning');
             }
         } else if (activeTab.url.includes('pixabay.com')) {
-            updateStatusMessage('??', 'Navigate to a user profile page to start scraping', 'warning');
+            updateStatusMessage('⚠️', 'Navigate to a user profile page to start scraping', 'warning');
         } else {
-            updateStatusMessage('??', 'Visit a Pixabay user profile to begin scraping', '');
+            updateStatusMessage('ℹ️', 'Visit a Pixabay user profile to begin scraping', '');
         }
         
     } catch (error) {
         console.error('Error checking current page:', error);
-        updateStatusMessage('?', 'Error checking page', 'error');
+        updateStatusMessage('❌', 'Error checking page', 'error');
     }
 }
 
@@ -123,7 +123,7 @@ function showUserInfo(userInfo) {
     if (userInfo.userImageURL) {
         avatarEl.innerHTML = `<img src="${userInfo.userImageURL}" alt="${userInfo.username}">`;
     } else {
-        avatarEl.innerHTML = '??';
+        avatarEl.innerHTML = '👤';
     }
     
     // Update user name and profile link
@@ -173,11 +173,11 @@ async function startCategoryDownload(category) {
         });
         
         console.log('Background script response:', response);
-        updateStatusMessage('??', `Scanning ${category} content from ${currentUsername}...`, 'success');
+        updateStatusMessage('🔍', `Scanning ${category} content from ${currentUsername}...`, 'success');
         
     } catch (error) {
         console.error('Download error:', error);
-        updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
+        updateStatusMessage('❌', `Download failed: ${error.message}`, 'error');
         hideProgress();
         hideDownloadControls();
         
@@ -197,7 +197,7 @@ async function pauseDownload() {
         document.getElementById('pauseBtn').disabled = true;
         document.getElementById('resumeBtn').disabled = false;
         
-        updateStatusMessage('??', 'Download paused', 'warning');
+        updateStatusMessage('⏸️', 'Download paused', 'warning');
     } catch (error) {
         console.error('Error pausing download:', error);
     }
@@ -211,7 +211,7 @@ async function resumeDownload() {
         document.getElementById('pauseBtn').disabled = false;
         document.getElementById('resumeBtn').disabled = true;
         
-        updateStatusMessage('??', 'Download resumed', 'success');
+        updateStatusMessage('▶️', 'Download resumed', 'success');
     } catch (error) {
         console.error('Error resuming download:', error);
     }
@@ -221,7 +221,7 @@ async function cancelDownload() {
     try {
         await chrome.runtime.sendMessage({ action: 'CANCEL_DOWNLOAD' });
         
-        updateStatusMessage('?', 'Download canceled', 'error');
+        updateStatusMessage('❌', 'Download canceled', 'error');
         hideProgress();
         hideDownloadControls();
         resetCategoryButtons();
@@ -292,16 +292,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_STARTED':
-            updateStatusMessage('??', `Downloading ${message.category} from ${message.username}...`, 'success');
+            updateStatusMessage('🚀', `Downloading ${message.category} from ${message.username}...`, 'success');
             break;
             
         case 'UPDATE_PROGRESS':
             updateProgress(message.current, message.total);
-            updateStatusMessage('??', `Downloaded ${message.current}/${message.total} files`, 'success');
+            updateStatusMessage('📥', `Downloaded ${message.current}/${message.total} files`, 'success');
             break;
             
         case 'DOWNLOAD_COMPLETE':
-            updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
+            updateStatusMessage('✅', `Download complete! ${message.count} files downloaded.`, 'success');
             hideProgress();
             hideDownloadControls();
             resetCategoryButtons();
@@ -311,7 +311,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_CANCELED':
-            updateStatusMessage('?', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
+            updateStatusMessage('❌', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
             hideProgress();
             hideDownloadControls();
             resetCategoryButtons();
@@ -321,16 +321,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_PAUSED':
-            updateStatusMessage('??', 'Download paused', 'warning');
+            updateStatusMessage('⏸️', 'Download paused', 'warning');
             break;
             
         case 'DOWNLOAD_RESUMED':
-            updateStatusMessage('??', 'Download resumed', 'success');
+            updateStatusMessage('▶️', 'Download resumed', 'success');
             break;
             
         case 'DOWNLOAD_ERROR':
             console.error('Download error from background:', message.error);
-            updateStatusMessage('?', `Error: ${message.error}`, 'error');
+            updateStatusMessage('❌', `Error: ${message.error}`, 'error');
             hideProgress();
             hideDownloadControls();
             resetCategoryButtons();
@@ -344,13 +344,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 function resetCategoryButtons() {
     // Reset all category buttons
     const categoryLabels = {
-        'photos': '?? Photos',
-        'illustrations': '?? Illustrations',
-        'vectors': '?? Vectors',
-        'videos': '?? Videos',
-        'music': '?? Music',
-        'sound-effects': '?? Sound FX',
-        'gifs': '??? GIFs'
+        'photos': '📷 Photos',
+        'illustrations': '🎨 Illustrations',
+        'vectors': '📐 Vectors',
+        'videos': '🎬 Videos',
+        'music': '🎵 Music',
+        'sound-effects': '🔊 Sound FX',
+        'gifs': '🎞️ GIFs'
     };
     
     Object.entries(categoryLabels).forEach(([category, label]) => {
