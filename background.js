@@ -68,43 +68,90 @@ async function getUserInfoFromPage(tabId) {
     }
 }
 
-// Function to be injected into the page to extract user info
+// Function to be injected into the page to extract user info with correct selectors
 function extractUserInfoFromPage() {
     try {
         // Extract username from URL
         const urlMatch = window.location.pathname.match(/\/users\/([^\/\?]+)/);
-        const username = urlMatch ? decodeURIComponent(urlMatch[1]) : null;
+        let username = urlMatch ? decodeURIComponent(urlMatch[1]) : null;
         
-        if (!username) return null;
-        
-        // Try to find user avatar and info on the page
+        // Try to get user info from DOM elements with correct selectors
         let userImageURL = '';
+        let displayName = '';
         let userId = '';
         
-        // Look for user avatar in various possible locations
+        // Look for user avatar using the specific class you provided
         const avatarSelectors = [
+            '.image--vdlQM',  // Primary selector for user profile image
             '.user-avatar img',
             '.profile-avatar img',
             '.user-profile img',
             '[data-testid="user-avatar"] img',
-            '.avatar img',
-            'img[alt*="' + username + '"]'
+            '.avatar img'
         ];
         
         for (const selector of avatarSelectors) {
             const avatarEl = document.querySelector(selector);
             if (avatarEl && avatarEl.src) {
                 userImageURL = avatarEl.src;
+                console.log(`Found avatar using selector: ${selector}`);
                 break;
             }
         }
         
-        return {
+        // Look for username using the specific class you provided
+        const nameSelectors = [
+            '.h1--bZ6EI.L--opXRs', // Primary selector for user name
+            '.h1--bZ6EI',          // Fallback without second class
+            'h1.h1--bZ6EI',        // With h1 tag
+            '.user-name',
+            '.profile-name',
+            'h1',
+            'h2'
+        ];
+        
+        for (const selector of nameSelectors) {
+            const nameEl = document.querySelector(selector);
+            if (nameEl && nameEl.textContent?.trim()) {
+                displayName = nameEl.textContent.trim();
+                console.log(`Found name using selector: ${selector} - "${displayName}"`);
+                break;
+            }
+        }
+        
+        // Extract user ID from URL or page elements
+        if (urlMatch) {
+            userId = urlMatch[1];
+        }
+        
+        // If we found display name but no username from URL, use display name
+        if (!username && displayName) {
+            username = displayName;
+        }
+        
+        // If we found username from URL but no display name, use username
+        if (username && !displayName) {
+            displayName = username;
+        }
+        
+        console.log('Extracted user info:', {
             username: username,
+            displayName: displayName,
             userImageURL: userImageURL,
-            userId: userId,
-            profileUrl: window.location.href
-        };
+            userId: userId
+        });
+        
+        if (username || displayName) {
+            return {
+                username: username || displayName,
+                displayName: displayName || username,
+                userImageURL: userImageURL,
+                userId: userId,
+                profileUrl: window.location.href
+            };
+        }
+        
+        return null;
     } catch (error) {
         console.error('Error extracting user info:', error);
         return null;

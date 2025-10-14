@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,9 +18,6 @@
             --pixabay-border: #e9ecef;
             --pixabay-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             --pixabay-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
-            --sound-fx-blue: #17a2b8;
-            --sound-fx-blue-dark: #138496;
-            --sound-fx-blue-light: #1fc5d8;
         }
 
         * {
@@ -49,18 +47,18 @@
             margin-bottom: 16px;
         }
 
-            .header h1 {
-                font-size: 18px;
-                font-weight: 600;
-                margin-bottom: 4px;
-                color: var(--sound-fx-blue);
-            }
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--pixabay-green);
+        }
 
-            .header .subtitle {
-                font-size: 12px;
-                opacity: 0.8;
-                color: var(--pixabay-gray);
-            }
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.8;
+            color: var(--pixabay-gray);
+        }
 
         .status-section {
             background: white;
@@ -113,16 +111,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 14px;
             color: var(--pixabay-gray);
+            overflow: hidden;
         }
 
-            .user-avatar img {
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                object-fit: cover;
-            }
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
 
         .user-details {
             flex: 1;
@@ -141,12 +140,18 @@
             text-decoration: none;
         }
 
-            .user-profile-link:hover {
-                color: var(--sound-fx-blue);
-            }
+        .user-profile-link:hover {
+            color: var(--pixabay-green);
+        }
+
+        .user-id {
+            font-size: 10px;
+            color: var(--pixabay-gray);
+            margin-top: 2px;
+        }
 
         .follow-btn {
-            background: var(--sound-fx-blue);
+            background: var(--pixabay-green);
             color: white;
             border: none;
             padding: 6px 12px;
@@ -156,9 +161,9 @@
             transition: all 0.2s ease;
         }
 
-            .follow-btn:hover {
-                background: var(--sound-fx-blue-dark);
-            }
+        .follow-btn:hover {
+            background: var(--pixabay-green-dark);
+        }
 
         .download-section {
             background: white;
@@ -178,7 +183,7 @@
         }
 
         .sound-fx-button {
-            background: linear-gradient(135deg, var(--sound-fx-blue), var(--sound-fx-blue-dark));
+            background: linear-gradient(135deg, var(--pixabay-green), var(--pixabay-green-dark));
             color: white;
             border: none;
             padding: 16px 20px;
@@ -198,41 +203,41 @@
             overflow: hidden;
         }
 
-            .sound-fx-button::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-                transition: left 0.6s ease;
-            }
+        .sound-fx-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.6s ease;
+        }
 
-            .sound-fx-button:hover::before {
-                left: 100%;
-            }
+        .sound-fx-button:hover::before {
+            left: 100%;
+        }
 
-            .sound-fx-button:hover:not(:disabled) {
-                background: linear-gradient(135deg, var(--sound-fx-blue-light), var(--sound-fx-blue));
-                transform: translateY(-2px);
-                box-shadow: 0 6px 16px rgba(23, 162, 184, 0.3);
-            }
+        .sound-fx-button:hover:not(:disabled) {
+            background: linear-gradient(135deg, var(--pixabay-green-light), var(--pixabay-green));
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(75, 194, 75, 0.3);
+        }
 
-            .sound-fx-button:disabled {
-                opacity: 0.6;
-                cursor: not-allowed;
-                background: var(--pixabay-gray);
-            }
+        .sound-fx-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: var(--pixabay-gray);
+        }
 
-            .sound-fx-button .count {
-                background: rgba(255, 255, 255, 0.2);
-                padding: 4px 8px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: 600;
-                margin-left: 8px;
-            }
+        .sound-fx-button .count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
 
         .items-list {
             background: white;
@@ -245,15 +250,15 @@
             overflow-y: auto;
         }
 
-            .items-list h4 {
-                font-size: 13px;
-                font-weight: 600;
-                margin-bottom: 8px;
-                color: var(--pixabay-gray-dark);
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
+        .items-list h4 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--pixabay-gray-dark);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
         .item-entry {
             display: flex;
@@ -263,13 +268,13 @@
             border-radius: 6px;
             font-size: 11px;
             margin-bottom: 4px;
-            background: linear-gradient(135deg, var(--pixabay-gray-light), rgba(23, 162, 184, 0.05));
-            border: 1px solid rgba(23, 162, 184, 0.1);
+            background: linear-gradient(135deg, var(--pixabay-gray-light), rgba(75, 194, 75, 0.05));
+            border: 1px solid rgba(75, 194, 75, 0.1);
         }
 
-            .item-entry:last-child {
-                margin-bottom: 0;
-            }
+        .item-entry:last-child {
+            margin-bottom: 0;
+        }
 
         .item-preview {
             width: 32px;
@@ -277,12 +282,13 @@
             border-radius: 6px;
             object-fit: cover;
             border: 1px solid var(--pixabay-border);
-            background: var(--sound-fx-blue);
+            background: var(--pixabay-green);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 16px;
+            font-size: 10px;
+            font-weight: 600;
         }
 
         .item-info {
@@ -322,30 +328,30 @@
             flex: 1;
         }
 
-            .control-btn:hover:not(:disabled) {
-                background: var(--pixabay-gray-dark);
-            }
+        .control-btn:hover:not(:disabled) {
+            background: var(--pixabay-gray-dark);
+        }
 
-            .control-btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-            }
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
 
-            .control-btn.pause {
-                background: var(--pixabay-orange);
-            }
+        .control-btn.pause {
+            background: var(--pixabay-orange);
+        }
 
-                .control-btn.pause:hover:not(:disabled) {
-                    background: var(--pixabay-orange-light);
-                }
+        .control-btn.pause:hover:not(:disabled) {
+            background: var(--pixabay-orange-light);
+        }
 
-            .control-btn.cancel {
-                background: #dc3545;
-            }
+        .control-btn.cancel {
+            background: #dc3545;
+        }
 
-                .control-btn.cancel:hover:not(:disabled) {
-                    background: #c82333;
-                }
+        .control-btn.cancel:hover:not(:disabled) {
+            background: #c82333;
+        }
 
         .progress-bar {
             background: var(--pixabay-border);
@@ -356,7 +362,7 @@
         }
 
         .progress-fill {
-            background: var(--sound-fx-blue);
+            background: var(--pixabay-green);
             height: 100%;
             width: 0%;
             transition: width 0.3s ease;
@@ -400,19 +406,19 @@
             text-align: center;
         }
 
-            .footer a {
-                color: var(--pixabay-gray);
-                text-decoration: none;
-                font-size: 11px;
-            }
+        .footer a {
+            color: var(--pixabay-gray);
+            text-decoration: none;
+            font-size: 11px;
+        }
 
-                .footer a:hover {
-                    color: var(--sound-fx-blue);
-                }
+        .footer a:hover {
+            color: var(--pixabay-green);
+        }
 
         .scraper-info {
-            background: linear-gradient(135deg, var(--sound-fx-blue-light), rgba(23, 162, 184, 0.1));
-            border: 1px solid var(--sound-fx-blue);
+            background: linear-gradient(135deg, rgba(75, 194, 75, 0.1), rgba(75, 194, 75, 0.05));
+            border: 1px solid var(--pixabay-green);
             border-radius: 8px;
             padding: 10px;
             margin-bottom: 12px;
@@ -421,7 +427,7 @@
         }
 
         .mode-indicator {
-            background: var(--sound-fx-blue);
+            background: var(--pixabay-green);
             color: white;
             padding: 2px 6px;
             border-radius: 4px;
@@ -435,8 +441,8 @@
         }
 
         .success .status-section {
-            background: rgba(23, 162, 184, 0.1);
-            border-color: var(--sound-fx-blue);
+            background: rgba(75, 194, 75, 0.1);
+            border-color: var(--pixabay-green);
         }
 
         .error .status-section {
@@ -452,10 +458,11 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔊 Sound Effects Downloader</h1>
+            <h1>Audio Sound Effects Downloader</h1>
             <div class="subtitle">
                 Extract sound effects from Pixabay
                 <span class="mode-indicator">AUDIO SCRAPER</span>
@@ -463,12 +470,12 @@
         </div>
 
         <div class="scraper-info">
-            🎯 <strong>Focused Audio Scraper:</strong> Specifically designed to extract all sound effects from the current Pixabay page using advanced DOM selectors.
+            <strong>Focused Audio Scraper:</strong> Specifically designed to extract all sound effects from the current Pixabay page using advanced DOM selectors.
         </div>
 
         <div class="status-section">
             <div class="status-title">
-                <span id="statusIcon">ℹ️</span>
+                <span id="statusIcon">i</span>
                 <span>Status</span>
             </div>
             <div class="status-message" id="statusMessage">
@@ -480,7 +487,7 @@
         <div class="user-info-section hidden" id="userInfoSection">
             <div class="user-profile">
                 <div class="user-avatar" id="userAvatar">
-                    👤
+                    User
                 </div>
                 <div class="user-details">
                     <div class="user-name" id="userName">Loading...</div>
@@ -492,18 +499,18 @@
 
         <!-- Download Section (shown when on user page) -->
         <div class="download-section hidden" id="downloadSection">
-            <div class="section-title">🔊 Sound Effects Extractor</div>
+            <div class="section-title">Audio Sound Effects Extractor</div>
 
             <button class="sound-fx-button" id="soundEffectsBtn">
-                🎵 Scan & Download Sound Effects
+                Audio Scan & Download Sound Effects
                 <span class="count" id="soundEffectsCount">0</span>
             </button>
 
             <!-- Download Controls -->
             <div class="download-controls hidden" id="downloadControls">
-                <button class="control-btn pause" id="pauseBtn">⏸️ Pause</button>
-                <button class="control-btn" id="resumeBtn" disabled>▶️ Resume</button>
-                <button class="control-btn cancel" id="cancelBtn">❌ Cancel</button>
+                <button class="control-btn pause" id="pauseBtn">Pause</button>
+                <button class="control-btn" id="resumeBtn" disabled>Resume</button>
+                <button class="control-btn cancel" id="cancelBtn">Cancel</button>
             </div>
 
             <!-- Progress Section -->
@@ -518,7 +525,7 @@
         <!-- Items List Section -->
         <div class="items-list hidden" id="itemsList">
             <h4>
-                <span>🎵 Scanned Sound Effects</span>
+                <span>Audio Scanned Sound Effects</span>
                 <span id="itemsCount">0 items</span>
             </h4>
             <div id="itemsContainer">
@@ -529,12 +536,13 @@
         </div>
 
         <div class="footer">
-            <a href="#" id="refreshBtn">🔄 Refresh</a> •
-            <a href="#" id="clearListBtn">🗑️ Clear List</a> •
+            <a href="#" id="refreshBtn">Refresh</a> •
+            <a href="#" id="clearListBtn">Clear List</a> •
             <a href="https://pixabay.com" target="_blank">Pixabay.com</a>
         </div>
     </div>
 
     <script src="popup.js"></script>
 </body>
+
 </html>

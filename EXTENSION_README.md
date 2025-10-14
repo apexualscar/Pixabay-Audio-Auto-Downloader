@@ -1,15 +1,18 @@
-# Pixabay Mass Downloader Chrome Extension
+# Pixabay Sound Effects Downloader Chrome Extension
 
-A Chrome extension built with Blazor WebAssembly and C# that allows you to download all submissions from any Pixabay user profile with a single click.
+A focused Chrome extension that extracts and downloads sound effects from Pixabay pages using advanced DOM selectors - no API key required!
 
 ## Features
 
-- ?? **Mass Download**: Download all images, sounds, or videos from any Pixabay user
-- ?? **Secure API Storage**: Your Pixabay API key is stored securely
-- ?? **Progress Tracking**: Real-time progress updates during downloads
-- ?? **Content Type Selection**: Choose between images, audio, videos, or all content
-- ?? **Preview Mode**: Preview submissions before downloading
-- ?? **Web Interface**: Use the extension as a web app or Chrome extension
+- **Focused Sound Effects Extraction**: Specifically designed to extract audio content from Pixabay
+- **Advanced DOM Selectors**: Uses precise CSS selectors (`audioRow--nAm4Z`, `nameAndTitle--KcBAZ`, `overlayContainer--0ZpHP`) for accurate content detection
+- **Direct Page Scraping**: Works on any Pixabay page containing sound effects
+- **No API Key Required**: Direct web scraping eliminates API limitations
+- **Real-time Progress**: Live scanning and download progress tracking
+- **Item List View**: Preview all found sound effects before downloading
+- **Pixabay Green Theme**: Matches Pixabay's official branding
+- **Organized Downloads**: Saves files to `pixabay_sound_effects/` folder
+- **User Profile Detection**: Shows user avatar, name, and ID when on profile pages
 
 ## Installation
 
@@ -19,161 +22,199 @@ A Chrome extension built with Blazor WebAssembly and C# that allows you to downl
 2. **Open Chrome and navigate to** `chrome://extensions/`
 3. **Enable "Developer mode"** in the top right corner
 4. **Click "Load unpacked"** and select the project root directory
-5. **The extension should now appear** in your extensions list
+5. **The Pixabay Sound Effects Downloader extension** should now appear with a green "PeX" icon
 
-### Web App Usage
+### Alternative: Use the PowerShell Installer
 
-1. **Build and run the Blazor WebAssembly application**:
-   ```bash
-   dotnet run --project Pixabay-Mass-Audio-Downloader
-   ```
-2. **Navigate to** `https://localhost:5001` (or your configured port)
-3. **Use the Mass Downloader page** to download content
+```powershell
+# Run the automated installer
+.\install-extension.ps1
+```
 
-## Setup
+## How to Use
 
-### 1. Get Your Pixabay API Key
+### Step 1: Visit Pixabay
+1. **Navigate to any Pixabay page** that contains sound effects
+   - User profiles: `https://pixabay.com/users/username/sound-effects/`
+   - Search results: `https://pixabay.com/sound-effects/search/nature/`
+   - Category pages: `https://pixabay.com/sound-effects/`
 
-1. Visit [Pixabay API Documentation](https://pixabay.com/api/docs/)
-2. Create a free account or log in
-3. Generate your API key (it's free!)
-4. Copy your API key for the next step
+### Step 2: Open the Extension
+1. **Click the green "PeX" icon** in your Chrome toolbar
+2. **The extension will detect** if sound effects are available on the current page
+3. **Status indicator** shows when ready to scan
+4. **User profile info** displayed if on a user's page (avatar, name, ID)
 
-### 2. Configure the Extension
+### Step 3: Scan for Sound Effects
+1. **Click "Scan & Download Sound Effects"** button
+2. **Watch the scanning progress** as it finds audio content
+3. **Review the items list** showing all detected sound effects
+4. **File names and IDs** are displayed for each item
 
-**Option A: Extension Popup**
-1. Click the extension icon in Chrome
-2. Enter your API key in the popup
-3. Click "Save API Key"
+### Step 4: Monitor Downloads
+1. **Downloads start automatically** after scanning completes
+2. **Use pause/resume/cancel** controls during download
+3. **Progress bar shows** current download status
+4. **Files are saved** to `Downloads/pixabay_sound_effects/`
 
-**Option B: Web Interface**
-1. Open the web app
-2. Go to the "Mass Downloader" page
-3. Enter your API key
-4. Click "Save Key"
+## Design Features
 
-## Usage
+### Pixabay Green Branding
+- **Primary Color**: `#4bc24b` (Pixabay Green)
+- **Secondary Colors**: White and gray tones
+- **Consistent Styling**: Matches Pixabay's official design language
+- **Green "PeX" Icon**: Instantly recognizable extension icon
 
-### Using the Chrome Extension
+### User Interface
+- **420x650px Popup**: Optimized for Chrome extensions
+- **Clean Layout**: Focused on sound effects extraction
+- **Real-time Feedback**: Live status updates and progress tracking
+- **Item Preview**: See exactly what will be downloaded
+- **User Info Display**: Shows profile picture, name, and user ID
 
-1. **Navigate to any Pixabay user profile** (e.g., `https://pixabay.com/users/username/`)
-2. **The extension will automatically add download buttons** to the user's profile page
-3. **Choose the content type** you want to download:
-   - ?? **Download All Images**
-   - ?? **Download All Sounds**
-   - ?? **Download All Videos**
-4. **Click the appropriate button** to start the download
-5. **Monitor progress** through the progress bar that appears
+## Technical Details
 
-### Using the Web Interface
+### Advanced Selector Technology
+```javascript
+// Primary selectors for Pixabay audio content
+const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
+const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+const titleElements = audioRow.querySelector('.nameAndTitle--KcBAZ');
 
-1. **Open the Mass Downloader page**
-2. **Enter the Pixabay username** you want to download from
-3. **Select the content type** (All, Images, Audio, Videos)
-4. **Click "Preview"** to see what will be downloaded (optional)
-5. **Click "Start Download"** to begin the download process
+// User profile selectors
+const userAvatar = document.querySelector('.image--vdlQM');
+const userName = document.querySelector('.h1--bZ6EI.L--opXRs');
+```
+
+### Smart Content Detection
+- **Specific CSS Classes**: Targets exact Pixabay audio elements
+- **Multiple Selector Strategies**: Primary and fallback detection methods
+- **Progressive Loading**: Scrolls through pages to load all available content
+- **Title Extraction**: Gets sound effect names from DOM elements
+- **User Profile Recognition**: Extracts user information when available
+
+### Download Management
+- **Chrome Downloads API**: Native browser download integration
+- **Organized Structure**: `pixabay_sound_effects/title_id.mp3` format
+- **Filename Sanitization**: Safe file names for all operating systems
+- **Progress Tracking**: Real-time download status updates
 
 ## File Structure
 
 ```
-?? Pixabay-Mass-Audio-Downloader/
-??? ?? manifest.json                    # Chrome extension manifest
-??? ?? content-script.js               # Content script for Pixabay pages
-??? ?? content-styles.css              # Styles for injected UI
-??? ?? background.js                   # Background service worker
-??? ?? popup.html                      # Extension popup interface
-??? ?? popup.js                        # Popup functionality
-??? ?? Components/
-?   ??? ?? Pages/
-?   ?   ??? ?? Home.razor              # Landing page
-?   ?   ??? ?? Downloader.razor        # Main downloader interface
-?   ??? ?? Layout/                     # Layout components
-??? ?? Services/
-?   ??? ?? PixabayApiService.cs        # Pixabay API integration
-?   ??? ?? DownloadService.cs          # Download management
-?   ??? ?? SecureStorageService.cs     # Secure storage handling
-??? ?? wwwroot/
-    ??? ?? js/
-        ??? ?? app.js                  # JavaScript utilities
+Pixabay Sound Effects Downloader/
+??? manifest.json                 # Extension configuration
+??? content-script.js            # DOM scanning logic
+??? content-styles.css           # Pixabay green styling
+??? background.js                # Download management
+??? popup.html                   # Extension interface
+??? popup.js                     # UI functionality
+??? icon.svg                     # Pixabay green "PeX" icon
+??? EXTENSION_README.md          # This documentation
 ```
 
-## How It Works
+## Supported Audio Formats
 
-1. **Content Script Injection**: When you visit a Pixabay user profile, the content script automatically injects download buttons
-2. **API Integration**: Uses the official Pixabay API to fetch user submissions
-3. **Batch Processing**: Downloads files in batches with progress tracking
-4. **Secure Storage**: API keys are stored securely using Chrome's storage API
-5. **File Management**: Downloaded files are organized in a `pixabay_downloads` folder
+- **Primary Format**: MP3 (most common)
+- **Alternative Formats**: WAV, OGG, AAC, M4A, FLAC
+- **Quality**: Depends on source file quality on Pixabay
+- **File Sizes**: Varies by audio length and quality
 
-## API Limits
+## Performance Features
 
-- **Pixabay API Rate Limits**: 
-  - 5,000 requests per hour for free accounts
-  - 20,000 requests per hour for premium accounts
-- **Download Limits**: Based on your internet connection and storage space
-- **File Size Limits**: Dependent on the original file sizes on Pixabay
+### Efficient Scanning
+- **Smart Scrolling**: Loads all content progressively
+- **Duplicate Detection**: Avoids processing same items multiple times
+- **Rate Limiting**: Respectful delays between operations
+- **Memory Management**: Efficient handling of large audio collections
 
-## Supported Content Types
-
-- **Images**: JPEG, PNG, WebP formats
-- **Audio**: MP3, WAV formats (where available)
-- **Videos**: MP4 format in various qualities
-- **All Content**: Downloads everything from the user
+### Download Optimization
+- **Parallel Processing**: Multiple downloads when possible
+- **Error Resilience**: Continues downloading even if some files fail
+- **Retry Logic**: Attempts to re-download failed items
+- **Progress Persistence**: Maintains progress state during pauses
 
 ## Troubleshooting
 
 ### Extension Not Working
-- Ensure developer mode is enabled in Chrome
-- Check that the extension is loaded and enabled
-- Verify you're on a Pixabay user profile page
+- **Check Extension**: Ensure it's enabled in `chrome://extensions/`
+- **Reload Page**: Refresh the Pixabay page after installing
+- **Check Permissions**: Verify the extension has access to Pixabay
+- **Developer Mode**: Ensure developer mode is enabled for unpacked extensions
 
-### API Key Issues
-- Verify your API key is valid at [Pixabay API](https://pixabay.com/api/docs/)
-- Check that you haven't exceeded rate limits
-- Ensure the key is properly saved in the extension
+### No Sound Effects Found
+- **Page Content**: Ensure the page actually contains audio content
+- **Scroll Down**: Some content loads dynamically as you scroll
+- **Try Different Pages**: Test on known sound effects pages
+- **Check Console**: Open Chrome DevTools for detailed error messages
 
 ### Download Issues
-- Check your internet connection
-- Verify sufficient storage space
-- Some files may not be available for download due to Pixabay restrictions
+- **Storage Space**: Ensure sufficient disk space for downloads
+- **Internet Connection**: Verify stable internet connectivity
+- **Download Permissions**: Check Chrome's download settings
+- **Antivirus Software**: Some security software may block downloads
 
-### Performance Tips
-- **For large collections**: Consider downloading in smaller batches
-- **Network considerations**: Downloads may be slower on slower connections
-- **Storage management**: Regularly clean up downloaded files
+### Performance Issues
+- **Large Collections**: Use pause/resume for very large collections
+- **Browser Resources**: Close unnecessary tabs during large downloads
+- **Network Speed**: Slower connections may require patience
+- **Page Complexity**: Complex pages may take longer to scan
+
+## Privacy & Security
+
+### Data Protection
+- **No Data Collection**: Extension doesn't collect personal information
+- **Local Processing**: All operations performed locally in your browser
+- **No External Servers**: Direct communication with Pixabay only
+- **Secure Storage**: Uses Chrome's secure storage APIs
+
+### Permissions Explained
+- **activeTab**: Access to current Pixabay tab for content extraction
+- **downloads**: Ability to save sound effects to your computer
+- **storage**: Temporary storage for extension settings
+- **scripting**: Inject scripts to analyze Pixabay page content
+
+## Advanced Usage Tips
+
+### Batch Processing
+1. **Open Multiple Tabs**: Process different Pixabay pages simultaneously
+2. **Use Bookmarks**: Save frequently accessed sound effect pages
+3. **Organize Downloads**: Create subfolders for different audio categories
+4. **Regular Cleanup**: Periodically organize your downloaded sound effects
+
+### Quality Optimization
+1. **Check Source Quality**: Higher quality sources = better downloads
+2. **Verify File Integrity**: Test downloaded audio files before use
+3. **Format Preferences**: MP3 offers best compatibility across devices
+4. **Backup Important Files**: Keep copies of frequently used sound effects
 
 ## Development
 
 ### Prerequisites
 - .NET 8 SDK
-- Visual Studio 2022 or VS Code
-- Chrome browser for testing
+- Chrome Browser (latest version)
+- Code editor (VS Code, Visual Studio)
 
-### Building the Project
+### Local Development
 ```bash
-# Restore packages
-dotnet restore
+# Clone the repository
+git clone <repository-url>
 
-# Build the application
-dotnet build
+# Navigate to project directory
+cd Pixabay-Mass-Audio-Downloader
 
-# Run the web application
-dotnet run --project Pixabay-Mass-Audio-Downloader
+# Load extension in Chrome
+# 1. Open chrome://extensions/
+# 2. Enable Developer mode
+# 3. Click "Load unpacked"
+# 4. Select project root directory
 ```
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Security
-
-- **API Key Storage**: Keys are stored using Chrome's secure storage API
-- **HTTPS Only**: All API calls use HTTPS
-- **No Data Collection**: The extension doesn't collect or transmit personal data
-- **Local Processing**: All processing is done locally in your browser
+### Testing
+1. **Test on Different Pages**: Various Pixabay sound effect pages
+2. **Check All Browsers**: Primarily Chrome, but test Chromium-based browsers
+3. **Verify Downloads**: Ensure audio files play correctly after download
+4. **Performance Testing**: Test with large collections of sound effects
 
 ## License
 
@@ -181,16 +222,31 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Disclaimer
 
-This tool is for personal use only. Please respect Pixabay's terms of service and the rights of content creators. Always verify that you have the right to download and use the content according to Pixabay's license terms.
+This tool is for personal use only. Please:
+- **Respect Pixabay's Terms**: Follow all Pixabay terms of service
+- **Honor Creator Rights**: Respect the rights of audio creators
+- **Check Licenses**: Verify license terms for each downloaded sound effect
+- **Use Responsibly**: Don't overload Pixabay's servers with excessive requests
 
 ## Support
 
 If you encounter issues:
-1. Check the troubleshooting section above
-2. Review Chrome's developer console for errors
-3. Verify your Pixabay API key is working
-4. Create an issue on GitHub with detailed information
+
+1. **Documentation**: Review this README thoroughly
+2. **Console Logs**: Check Chrome DevTools console for errors
+3. **Refresh Extension**: Reload the extension in Chrome
+4. **Report Issues**: Create detailed bug reports with screenshots
+5. **Feature Requests**: Suggest improvements via issues
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Follow the existing code style
+4. Test thoroughly on multiple Pixabay pages
+5. Submit a pull request with clear description
 
 ---
 
-**Enjoy bulk downloading from Pixabay! ??**
+**Happy sound hunting on Pixabay!**

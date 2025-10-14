@@ -21,7 +21,7 @@ async function initializePopup() {
         
     } catch (error) {
         console.error('Error initializing popup:', error);
-        updateStatusMessage('?', 'Error loading extension', 'error');
+        updateStatusMessage('X', 'Error loading extension', 'error');
     }
 }
 
@@ -50,7 +50,7 @@ function setupEventListeners() {
 }
 
 async function updateStatus() {
-    updateStatusMessage('?', 'Checking status...', '');
+    updateStatusMessage('...', 'Checking status...', '');
 }
 
 async function checkCurrentPage() {
@@ -58,7 +58,7 @@ async function checkCurrentPage() {
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
         if (!activeTab || !activeTab.url) {
-            updateStatusMessage('??', 'No active tab detected', 'warning');
+            updateStatusMessage('i', 'No active tab detected', 'warning');
             return;
         }
         
@@ -79,14 +79,14 @@ async function checkCurrentPage() {
             
             // Show download section regardless of being on user profile
             showDownloadSection();
-            updateStatusMessage('?', 'Ready to scan sound effects from current page', 'success');
+            updateStatusMessage('Check', 'Ready to scan sound effects from current page', 'success');
         } else {
-            updateStatusMessage('??', 'Visit a Pixabay page to scan for sound effects', 'warning');
+            updateStatusMessage('!', 'Visit a Pixabay page to scan for sound effects', 'warning');
         }
         
     } catch (error) {
         console.error('Error checking current page:', error);
-        updateStatusMessage('?', 'Error checking page', 'error');
+        updateStatusMessage('X', 'Error checking page', 'error');
     }
 }
 
@@ -123,11 +123,35 @@ function showUserInfo(userInfo) {
     if (userInfo.userImageURL) {
         avatarEl.innerHTML = `<img src="${userInfo.userImageURL}" alt="${userInfo.username}">`;
     } else {
-        avatarEl.innerHTML = '??';
+        avatarEl.innerHTML = 'User';
     }
     
     // Update user name and profile link
-    document.getElementById('userName').textContent = userInfo.username;
+    const displayName = userInfo.displayName || userInfo.username;
+    document.getElementById('userName').textContent = displayName;
+    
+    // Add user ID footer under the name
+    const userDetailsEl = document.querySelector('.user-details');
+    
+    // Remove existing user ID if present
+    const existingUserId = userDetailsEl.querySelector('.user-id');
+    if (existingUserId) {
+        existingUserId.remove();
+    }
+    
+    // Add user ID footer
+    if (userInfo.userId) {
+        const userIdEl = document.createElement('div');
+        userIdEl.className = 'user-id';
+        userIdEl.style.cssText = `
+            font-size: 10px;
+            color: var(--pixabay-gray);
+            margin-top: 2px;
+        `;
+        userIdEl.textContent = `ID: ${userInfo.userId}`;
+        userDetailsEl.appendChild(userIdEl);
+    }
+    
     const profileLink = document.getElementById('userProfileLink');
     profileLink.href = userInfo.profileUrl;
     profileLink.textContent = 'View Profile';
@@ -171,11 +195,11 @@ async function startSoundEffectsDownload() {
         });
         
         console.log('Background script response:', response);
-        updateStatusMessage('??', 'Scanning current page for sound effects...', 'success');
+        updateStatusMessage('Search', 'Scanning current page for sound effects...', 'success');
         
     } catch (error) {
         console.error('Scan error:', error);
-        updateStatusMessage('?', `Scan failed: ${error.message}`, 'error');
+        updateStatusMessage('X', `Scan failed: ${error.message}`, 'error');
         hideProgress();
         hideDownloadControls();
         
@@ -194,7 +218,7 @@ async function pauseDownload() {
         document.getElementById('pauseBtn').disabled = true;
         document.getElementById('resumeBtn').disabled = false;
         
-        updateStatusMessage('??', 'Download paused', 'warning');
+        updateStatusMessage('Pause', 'Download paused', 'warning');
     } catch (error) {
         console.error('Error pausing download:', error);
     }
@@ -208,7 +232,7 @@ async function resumeDownload() {
         document.getElementById('pauseBtn').disabled = false;
         document.getElementById('resumeBtn').disabled = true;
         
-        updateStatusMessage('??', 'Download resumed', 'success');
+        updateStatusMessage('Play', 'Download resumed', 'success');
     } catch (error) {
         console.error('Error resuming download:', error);
     }
@@ -218,7 +242,7 @@ async function cancelDownload() {
     try {
         await chrome.runtime.sendMessage({ action: 'CANCEL_DOWNLOAD' });
         
-        updateStatusMessage('?', 'Download canceled', 'error');
+        updateStatusMessage('X', 'Download canceled', 'error');
         hideProgress();
         hideDownloadControls();
         resetDownloadButton();
@@ -268,7 +292,7 @@ function updateItemsList() {
     
     container.innerHTML = scannedItems.map((item, index) => `
         <div class="item-entry">
-            <div class="item-preview">??</div>
+            <div class="item-preview">Audio</div>
             <div class="item-info">
                 <div class="item-title">${item.title}</div>
                 <div class="item-id">ID: ${item.id}</div>
@@ -313,7 +337,7 @@ function updateProgress(current, total) {
 
 function resetDownloadButton() {
     const downloadBtn = document.getElementById('soundEffectsBtn');
-    downloadBtn.innerHTML = `?? Scan & Download Sound Effects <span class="count">${scannedItems.length}</span>`;
+    downloadBtn.innerHTML = `Audio Scan & Download Sound Effects <span class="count">${scannedItems.length}</span>`;
     downloadBtn.disabled = false;
 }
 
@@ -331,9 +355,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         case 'SOUND_EFFECTS_SCANNED':
             if (message.items && message.items.length > 0) {
                 showItemsList(message.items);
-                updateStatusMessage('?', `Found ${message.items.length} sound effects`, 'success');
+                updateStatusMessage('Check', `Found ${message.items.length} sound effects`, 'success');
             } else {
-                updateStatusMessage('??', 'No sound effects found on this page', 'warning');
+                updateStatusMessage('!', 'No sound effects found on this page', 'warning');
                 resetDownloadButton();
                 hideProgress();
                 hideDownloadControls();
@@ -342,16 +366,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_STARTED':
-            updateStatusMessage('??', `Downloading ${scannedItems.length} sound effects...`, 'success');
+            updateStatusMessage('Arrow', `Downloading ${scannedItems.length} sound effects...`, 'success');
             break;
             
         case 'UPDATE_PROGRESS':
             updateProgress(message.current, message.total);
-            updateStatusMessage('??', `Downloaded ${message.current}/${message.total} files`, 'success');
+            updateStatusMessage('Download', `Downloaded ${message.current}/${message.total} files`, 'success');
             break;
             
         case 'DOWNLOAD_COMPLETE':
-            updateStatusMessage('?', `Download complete! ${message.count} sound effects downloaded.`, 'success');
+            updateStatusMessage('Check', `Download complete! ${message.count} sound effects downloaded.`, 'success');
             hideProgress();
             hideDownloadControls();
             resetDownloadButton();
@@ -360,7 +384,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_CANCELED':
-            updateStatusMessage('?', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
+            updateStatusMessage('X', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
             hideProgress();
             hideDownloadControls();
             resetDownloadButton();
@@ -369,16 +393,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_PAUSED':
-            updateStatusMessage('??', 'Download paused', 'warning');
+            updateStatusMessage('Pause', 'Download paused', 'warning');
             break;
             
         case 'DOWNLOAD_RESUMED':
-            updateStatusMessage('??', 'Download resumed', 'success');
+            updateStatusMessage('Play', 'Download resumed', 'success');
             break;
             
         case 'DOWNLOAD_ERROR':
             console.error('Download error from background:', message.error);
-            updateStatusMessage('?', `Error: ${message.error}`, 'error');
+            updateStatusMessage('X', `Error: ${message.error}`, 'error');
             hideProgress();
             hideDownloadControls();
             resetDownloadButton();
@@ -388,7 +412,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             
         case 'SCANNING_ERROR':
             console.error('Scanning error from background:', message.error);
-            updateStatusMessage('?', `Scanning failed: ${message.error}`, 'error');
+            updateStatusMessage('X', `Scanning failed: ${message.error}`, 'error');
             resetDownloadButton();
             isDownloading = false;
             break;

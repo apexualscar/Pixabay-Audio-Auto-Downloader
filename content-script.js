@@ -32,7 +32,7 @@ function addScrapingIndicators() {
             position: fixed;
             top: 10px;
             right: 10px;
-            background: #17a2b8;
+            background: #4bc24b;
             color: white;
             padding: 8px 12px;
             border-radius: 20px;
@@ -42,7 +42,7 @@ function addScrapingIndicators() {
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         ">
-            ?? Audio Scraper Ready
+            PeX Audio Scraper Ready
         </div>
     `;
     
@@ -171,9 +171,12 @@ async function scrollToLoadAll() {
 }
 
 function countSoundEffectsOnCurrentPage() {
-    // Count items using the specific selector you provided
+    // Count items using the specific selectors you provided
+    const audioContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
     const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-    return audioRows.length;
+    
+    // Return the higher count as fallback
+    return Math.max(audioContainers.length, audioRows.length);
 }
 
 async function extractSoundEffectsWithProgress() {
@@ -182,15 +185,62 @@ async function extractSoundEffectsWithProgress() {
     
     const soundEffects = [];
     
-    // Use the specific selectors you mentioned
+    // Use the specific selectors you mentioned for sound effect items
+    const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
+    console.log(`Found ${overlayContainers.length} overlay containers with classes "overlayContainer--0ZpHP lazyImg--u6+yh"`);
+    
+    // Also try the original audioRow selector as fallback
     const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
     console.log(`Found ${audioRows.length} audio rows with class "audioRow--nAm4Z"`);
     
-    if (audioRows.length === 0) {
-        console.log('No audio rows found, trying alternative selectors...');
+    // Process overlay containers first (your new selector)
+    if (overlayContainers.length > 0) {
+        for (let i = 0; i < overlayContainers.length; i++) {
+            const container = overlayContainers[i];
+            
+            try {
+                const soundEffect = extractSoundEffectFromOverlayContainer(container, i);
+                if (soundEffect) {
+                    soundEffects.push(soundEffect);
+                    
+                    // Update progress every 10 items
+                    if (soundEffects.length % 10 === 0) {
+                        showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error processing overlay container ${i}:`, error);
+            }
+        }
+    }
+    
+    // If no overlay containers found, try audioRows as fallback
+    if (soundEffects.length === 0 && audioRows.length > 0) {
+        for (let i = 0; i < audioRows.length; i++) {
+            const audioRow = audioRows[i];
+            
+            try {
+                const soundEffect = extractSoundEffectFromRow(audioRow, i);
+                if (soundEffect) {
+                    soundEffects.push(soundEffect);
+                    
+                    // Update progress every 10 items
+                    if (soundEffects.length % 10 === 0) {
+                        showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error processing audio row ${i}:`, error);
+            }
+        }
+    }
+    
+    // If still no results, try alternative selectors
+    if (soundEffects.length === 0) {
+        console.log('No sound effects found with primary selectors, trying alternatives...');
         
-        // Try alternative selectors as fallback
         const alternativeSelectors = [
+            '[class*="overlayContainer"]',
             '[class*="audioRow"]',
             '[class*="audio-row"]',
             '[class*="sound-row"]',
@@ -203,33 +253,94 @@ async function extractSoundEffectsWithProgress() {
             const elements = document.querySelectorAll(selector);
             if (elements.length > 0) {
                 console.log(`Found ${elements.length} items using fallback selector: ${selector}`);
-                elements.forEach(element => audioRows.push ? null : audioRows.push(element));
+                
+                for (let i = 0; i < elements.length; i++) {
+                    try {
+                        const soundEffect = extractSoundEffectFromGenericElement(elements[i], i);
+                        if (soundEffect) {
+                            soundEffects.push(soundEffect);
+                        }
+                    } catch (error) {
+                        console.error(`Error processing element ${i}:`, error);
+                    }
+                }
                 break;
             }
         }
     }
     
-    // Process each audio row
-    for (let i = 0; i < audioRows.length; i++) {
-        const audioRow = audioRows[i];
-        
-        try {
-            const soundEffect = extractSoundEffectFromRow(audioRow, i);
-            if (soundEffect) {
-                soundEffects.push(soundEffect);
-                
-                // Update progress every 10 items
-                if (soundEffects.length % 10 === 0) {
-                    showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
-                }
-            }
-        } catch (error) {
-            console.error(`Error processing audio row ${i}:`, error);
-        }
-    }
-    
     console.log(`Successfully extracted ${soundEffects.length} sound effects`);
     return soundEffects;
+}
+
+function extractSoundEffectFromOverlayContainer(container, index) {
+    try {
+        // Look for links within the overlay container
+        const linkElement = container.querySelector('a');
+        let itemUrl = linkElement ? linkElement.href : '';
+        let itemId = `sound_${index}`;
+        
+        // Extract ID from URL if available
+        if (itemUrl) {
+            const idMatch = itemUrl.match(/\/(\d+)/);
+            if (idMatch) {
+                itemId = idMatch[1];
+            }
+        }
+        
+        // Look for image within the container
+        const imgElement = container.querySelector('img');
+        let previewUrl = '';
+        let title = '';
+        
+        if (imgElement) {
+            previewUrl = imgElement.src || imgElement.getAttribute('data-src') || '';
+            title = imgElement.alt || imgElement.title || '';
+        }
+        
+        // Try to find title from nearby elements or link text
+        if (!title && linkElement) {
+            title = linkElement.getAttribute('title') || 
+                   linkElement.textContent?.trim() || '';
+        }
+        
+        // Look for any text content within the container
+        if (!title) {
+            const textElements = container.querySelectorAll('span, div, p');
+            for (const textEl of textElements) {
+                const text = textEl.textContent?.trim();
+                if (text && text.length > 2 && text.length < 100) {
+                    title = text;
+                    break;
+                }
+            }
+        }
+        
+        // Generate fallback title if none found
+        if (!title) {
+            title = `Sound Effect ${index + 1}`;
+        }
+        
+        console.log(`Extracted from overlay container:`, {
+            id: itemId,
+            title: title,
+            downloadUrl: itemUrl,
+            previewUrl: previewUrl
+        });
+        
+        return {
+            id: itemId,
+            title: title,
+            downloadUrl: itemUrl,
+            previewUrl: previewUrl,
+            category: 'sound-effects',
+            element: container
+        };
+        
+    } catch (error) {
+        console.error(`Error extracting from overlay container ${index}:`, error);
+        return null;
+    }
 }
 
 function extractSoundEffectFromRow(audioRow, index) {
@@ -352,6 +463,58 @@ function extractSoundEffectFromRow(audioRow, index) {
     }
 }
 
+function extractSoundEffectFromGenericElement(element, index) {
+    try {
+        let title = '';
+        let downloadUrl = '';
+        let previewUrl = '';
+        let itemId = `sound_${index}`;
+        
+        // Try to find any link
+        const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
+        if (link && link.href) {
+            downloadUrl = link.href;
+            const idMatch = downloadUrl.match(/\/(\d+)/);
+            if (idMatch) {
+                itemId = idMatch[1];
+            }
+        }
+        
+        // Try to find any image
+        const img = element.querySelector('img');
+        if (img) {
+            previewUrl = img.src || img.getAttribute('data-src') || '';
+            if (!title) {
+                title = img.alt || img.title || '';
+            }
+        }
+        
+        // Try to find text content
+        if (!title) {
+            title = element.textContent?.trim() || `Sound Effect ${index + 1}`;
+        }
+        
+        // Clean up title (remove extra whitespace, limit length)
+        title = title.replace(/\s+/g, ' ').substring(0, 100).trim();
+        
+        if (title) {
+            return {
+                id: itemId,
+                title: title,
+                downloadUrl: downloadUrl,
+                previewUrl: previewUrl,
+                category: 'sound-effects',
+                element: element
+            };
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`Error extracting from generic element ${index}:`, error);
+        return null;
+    }
+}
+
 function showScrapingProgress(message) {
     let progressEl = document.getElementById('pixabay-sound-scraping-progress');
     
@@ -363,7 +526,7 @@ function showScrapingProgress(message) {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(23, 162, 184, 0.95);
+            background: rgba(75, 194, 75, 0.95);
             color: white;
             padding: 20px 30px;
             border-radius: 10px;

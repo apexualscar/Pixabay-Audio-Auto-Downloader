@@ -3,6 +3,12 @@
   "name": "Pixabay Sound Effects Downloader",
   "version": "3.0",
   "description": "Extract and download sound effects from Pixabay pages using advanced DOM selectors - no API key required!",
+  "icons": {
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
+  },
   "permissions": [
     "activeTab",
     "storage",
@@ -26,11 +32,17 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pixabay Sound Effects Downloader"
+    "default_title": "Pixabay Sound Effects Downloader",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg",
+      "48": "icon.svg",
+      "128": "icon.svg"
+    }
   },
   "web_accessible_resources": [
     {
-      "resources": ["content-styles.css", "popup.html"],
+      "resources": ["content-styles.css", "popup.html", "icon.svg"],
       "matches": ["https://pixabay.com/*"]
     }
   ]
