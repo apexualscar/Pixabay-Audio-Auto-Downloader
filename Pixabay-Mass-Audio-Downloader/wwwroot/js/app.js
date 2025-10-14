@@ -21,6 +21,31 @@ window.downloadFile = (url, filename) => {
     });
 };
 
+// Enhanced download function that supports folder structure
+window.downloadFileToFolder = (url, filepath) => {
+    return new Promise((resolve, reject) => {
+        try {
+            // Extract filename from filepath for display
+            const filename = filepath.split('/').pop() || 'download';
+            
+            // Create a temporary anchor element
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filepath; // Use full path including folder
+            link.style.display = 'none';
+            
+            // Add to DOM, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            resolve();
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
 window.downloadBlob = (data, filename, mimeType) => {
     const blob = new Blob([data], { type: mimeType });
     const url = window.URL.createObjectURL(blob);
@@ -67,6 +92,32 @@ window.downloadFromUrl = async (url, filename) => {
     }
 };
 
+// Batch download function with folder support
+window.downloadBatch = async (downloads, progressCallback) => {
+    let completed = 0;
+    const total = downloads.length;
+    
+    for (const download of downloads) {
+        try {
+            await window.downloadFileToFolder(download.url, download.filepath);
+            completed++;
+            
+            if (progressCallback) {
+                progressCallback(completed, total);
+            }
+            
+            // Add small delay between downloads
+            await window.utils.sleep(150);
+            
+        } catch (error) {
+            console.error(`Failed to download ${download.filepath}:`, error);
+            // Continue with next download
+        }
+    }
+    
+    return completed;
+};
+
 // Chrome extension specific functions
 window.chromeExtension = {
     isAvailable: () => {
@@ -99,6 +150,29 @@ window.chromeExtension = {
         } else {
             return Promise.resolve(null);
         }
+    },
+    
+    // Download using Chrome's native download API (if available)
+    downloadNative: (url, filename) => {
+        if (window.chromeExtension.isAvailable() && chrome.downloads) {
+            return new Promise((resolve, reject) => {
+                chrome.downloads.download({
+                    url: url,
+                    filename: filename,
+                    saveAs: false,
+                    conflictAction: 'uniquify'
+                }, (downloadId) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(downloadId);
+                    }
+                });
+            });
+        } else {
+            // Fallback to regular download
+            return window.downloadFileToFolder(url, filename);
+        }
     }
 };
 
@@ -106,30 +180,54 @@ window.chromeExtension = {
 window.secureStorage = {
     getItem: (key) => {
         try {
-            return localStorage.getItem(key);
+            if (window.chromeExtension.isAvailable()) {
+                return new Promise((resolve) => {
+                    chrome.storage.local.get([key], (result) => {
+                        resolve(result[key] || null);
+                    });
+                });
+            } else {
+                return Promise.resolve(localStorage.getItem(key));
+            }
         } catch (error) {
             console.error('Error reading from storage:', error);
-            return null;
+            return Promise.resolve(null);
         }
     },
     
     setItem: (key, value) => {
         try {
-            localStorage.setItem(key, value);
-            return true;
+            if (window.chromeExtension.isAvailable()) {
+                return new Promise((resolve) => {
+                    chrome.storage.local.set({ [key]: value }, () => {
+                        resolve(true);
+                    });
+                });
+            } else {
+                localStorage.setItem(key, value);
+                return Promise.resolve(true);
+            }
         } catch (error) {
             console.error('Error writing to storage:', error);
-            return false;
+            return Promise.resolve(false);
         }
     },
     
     removeItem: (key) => {
         try {
-            localStorage.removeItem(key);
-            return true;
+            if (window.chromeExtension.isAvailable()) {
+                return new Promise((resolve) => {
+                    chrome.storage.local.remove([key], () => {
+                        resolve(true);
+                    });
+                });
+            } else {
+                localStorage.removeItem(key);
+                return Promise.resolve(true);
+            }
         } catch (error) {
             console.error('Error removing from storage:', error);
-            return false;
+            return Promise.resolve(false);
         }
     }
 };
@@ -185,12 +283,41 @@ window.utils = {
         return `${prefix}${name}.${ext}`;
     },
     
+    sanitizeFilename: (filename) => {
+        if (!filename) return 'unknown';
+        return filename
+            .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+            .replace(/\s+/g, '_')
+            .replace(/_{2,}/g, '_')
+            .toLowerCase()
+            .substring(0, 50);
+    },
+    
     validateApiKey: (apiKey) => {
         return apiKey && typeof apiKey === 'string' && apiKey.length > 10;
     },
     
     extractUsernameFromUrl: (url) => {
         const match = url.match(/\/users\/([^\/\?]+)/);
-        return match ? match[1] : null;
+        return match ? decodeURIComponent(match[1]) : null;
+    },
+    
+    // Create folder structure in filename
+    createFolderPath: (username, contentType, filename) => {
+        const sanitizedUser = window.utils.sanitizeFilename(username);
+        const folderName = `${sanitizedUser}_${contentType}`;
+        return `${folderName}/${filename}`;
+    },
+    
+    // Show notification (if supported)
+    showNotification: (title, message, type = 'info') => {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(title, {
+                body: message,
+                icon: '/favicon.png'
+            });
+        } else {
+            console.log(`${title}: ${message}`);
+        }
     }
 };

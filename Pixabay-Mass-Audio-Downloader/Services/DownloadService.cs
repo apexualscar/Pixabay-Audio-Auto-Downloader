@@ -27,13 +27,16 @@ namespace Pixabay_Mass_Audio_Downloader.Services
             var downloadedCount = 0;
             var totalCount = submissions.Count;
 
+            // Create folder name: username_contenttype (e.g., "john_doe_images")
+            var folderName = $"{SanitizeFilename(username)}_{contentType}";
+
             for (int i = 0; i < submissions.Count; i++)
             {
                 var submission = submissions[i];
                 
                 try
                 {
-                    await DownloadFileAsync(submission, contentType);
+                    await DownloadFileAsync(submission, contentType, folderName, username);
                     downloadedCount++;
                 }
                 catch (Exception ex)
@@ -51,46 +54,95 @@ namespace Pixabay_Mass_Audio_Downloader.Services
                 });
 
                 // Small delay to avoid overwhelming the browser
-                await Task.Delay(100);
+                await Task.Delay(200);
             }
 
             return downloadedCount;
         }
 
-        private async Task DownloadFileAsync(PixabayItem submission, string contentType)
+        private async Task DownloadFileAsync(PixabayItem submission, string contentType, string folderName, string username)
         {
-            var (downloadUrl, filename) = GetDownloadInfo(submission, contentType);
+            var (downloadUrl, extension) = GetDownloadInfo(submission, contentType);
             
             if (string.IsNullOrEmpty(downloadUrl))
             {
                 throw new InvalidOperationException("No download URL available");
             }
 
-            // Use JavaScript to trigger download
-            await _jsRuntime.InvokeVoidAsync("downloadFile", downloadUrl, filename);
+            // Create structured filename: foldername/user_id_description.ext
+            var safeUser = SanitizeFilename(submission.User ?? username);
+            var safeDescription = SanitizeFilename(GetFirstTag(submission.Tags) ?? "content");
+            var filename = $"{folderName}/{safeUser}_{submission.Id}_{safeDescription}.{extension}";
+
+            // Use JavaScript to trigger download with folder structure
+            await _jsRuntime.InvokeVoidAsync("downloadFileToFolder", downloadUrl, filename);
         }
 
-        private (string url, string filename) GetDownloadInfo(PixabayItem submission, string contentType)
+        private (string url, string extension) GetDownloadInfo(PixabayItem submission, string contentType)
         {
             return contentType.ToLower() switch
             {
                 "photo" => (
                     submission.LargeImageURL ?? submission.WebformatURL,
-                    $"pixabay_image_{submission.Id}_{submission.User}.jpg"
+                    "jpg"
                 ),
                 "music" => (
-                    submission.DownloadUrl ?? "",
-                    $"pixabay_audio_{submission.Id}_{submission.User}.mp3"
+                    submission.DownloadUrl ?? submission.WebformatURL,
+                    "mp3"
                 ),
                 "video" => (
                     submission.Videos?.Large?.Url ?? submission.Videos?.Medium?.Url ?? "",
-                    $"pixabay_video_{submission.Id}_{submission.User}.mp4"
+                    "mp4"
                 ),
                 _ => (
                     submission.WebformatURL,
-                    $"pixabay_{contentType}_{submission.Id}_{submission.User}"
+                    GetExtensionFromUrl(submission.WebformatURL) ?? "jpg"
                 )
             };
+        }
+
+        private string SanitizeFilename(string filename)
+        {
+            if (string.IsNullOrWhiteSpace(filename)) return "unknown";
+            
+            // Remove or replace characters that are not allowed in filenames
+            return filename
+                .Replace("/", "_")
+                .Replace("\\", "_")
+                .Replace(":", "_")
+                .Replace("*", "_")
+                .Replace("?", "_")
+                .Replace("\"", "_")
+                .Replace("<", "_")
+                .Replace(">", "_")
+                .Replace("|", "_")
+                .Replace(" ", "_")
+                .ToLowerInvariant()
+                .Substring(0, Math.Min(filename.Length, 50)); // Limit length
+        }
+
+        private string? GetFirstTag(string? tags)
+        {
+            if (string.IsNullOrWhiteSpace(tags)) return null;
+            
+            var firstTag = tags.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim();
+            return string.IsNullOrWhiteSpace(firstTag) ? null : firstTag;
+        }
+
+        private string? GetExtensionFromUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            
+            try
+            {
+                var uri = new Uri(url);
+                var extension = Path.GetExtension(uri.AbsolutePath)?.TrimStart('.');
+                return string.IsNullOrWhiteSpace(extension) ? null : extension;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 

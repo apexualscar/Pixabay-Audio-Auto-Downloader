@@ -1,131 +1,265 @@
-// Popup script for the Chrome extension
-document.addEventListener('DOMContentLoaded', async function() {
-    const apiKeyInput = document.getElementById('apiKey');
-    const saveApiKeyBtn = document.getElementById('saveApiKey');
-    const apiKeyStatus = document.getElementById('apiKeyStatus');
-    const extensionStatus = document.getElementById('extensionStatus');
-    
-    // Load existing API key
-    await loadApiKey();
-    
-    // Check current tab status
-    await checkCurrentTab();
-    
-    // Save API key
-    saveApiKeyBtn.addEventListener('click', saveApiKey);
-    
-    // Save on Enter key
-    apiKeyInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            saveApiKey();
+// Optimized popup script - loads instantly
+let currentUsername = null;
+let isDownloading = false;
+
+// Initialize immediately when DOM is ready
+document.addEventListener('DOMContentLoaded', initializePopup);
+
+async function initializePopup() {
+    try {
+        // Quick status check first
+        await updateStatus();
+        
+        // Check API key
+        const hasApiKey = await checkApiKey();
+        
+        if (!hasApiKey) {
+            showApiKeySection();
+        } else {
+            await checkCurrentPage();
         }
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+    } catch (error) {
+        console.error('Error initializing popup:', error);
+        updateStatusMessage('?', 'Error loading extension', 'error');
+    }
+}
+
+function setupEventListeners() {
+    // API key save
+    document.getElementById('saveApiKeyBtn').addEventListener('click', saveApiKey);
+    document.getElementById('apiKeyInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') saveApiKey();
     });
     
-    async function loadApiKey() {
-        try {
-            const result = await chrome.storage.local.get(['pixabayApiKey']);
-            if (result.pixabayApiKey) {
-                apiKeyInput.value = '••••••••••••••••'; // Show masked key
-                showStatus(apiKeyStatus, 'API key is saved', 'success');
-            }
-        } catch (error) {
-            console.error('Error loading API key:', error);
-        }
-    }
+    // Download buttons
+    document.getElementById('downloadImages').addEventListener('click', () => startDownload('photo'));
+    document.getElementById('downloadAudio').addEventListener('click', () => startDownload('music'));
+    document.getElementById('downloadVideos').addEventListener('click', () => startDownload('video'));
     
-    async function saveApiKey() {
-        const apiKey = apiKeyInput.value.trim();
+    // Settings
+    document.getElementById('settingsLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        showApiKeySection();
+    });
+}
+
+async function updateStatus() {
+    updateStatusMessage('?', 'Checking status...', '');
+}
+
+async function checkApiKey() {
+    try {
+        const result = await chrome.storage.local.get(['pixabayApiKey']);
+        return !!(result.pixabayApiKey && result.pixabayApiKey.length > 10);
+    } catch (error) {
+        console.error('Error checking API key:', error);
+        return false;
+    }
+}
+
+async function checkCurrentPage() {
+    try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        if (!apiKey || apiKey === '••••••••••••••••') {
-            showStatus(apiKeyStatus, 'Please enter a valid API key', 'error');
+        if (!activeTab || !activeTab.url) {
+            updateStatusMessage('??', 'No active tab detected', 'warning');
             return;
         }
         
-        // Basic API key validation (Pixabay keys are typically 32 characters)
-        if (apiKey.length < 10) {
-            showStatus(apiKeyStatus, 'API key seems too short. Please check your key.', 'error');
-            return;
+        if (activeTab.url.includes('pixabay.com/users/')) {
+            currentUsername = extractUsernameFromUrl(activeTab.url);
+            if (currentUsername) {
+                showDownloadSection(currentUsername);
+                updateStatusMessage('?', `Ready to download from: ${currentUsername}`, 'success');
+            } else {
+                updateStatusMessage('??', 'Unable to detect username', 'warning');
+            }
+        } else if (activeTab.url.includes('pixabay.com')) {
+            updateStatusMessage('??', 'Navigate to a user profile page', 'warning');
+        } else {
+            updateStatusMessage('??', 'Not on Pixabay. Visit a user profile.', '');
         }
         
-        try {
-            // Test the API key by making a simple request
-            const testUrl = `https://pixabay.com/api/?key=${apiKey}&per_page=3`;
-            const response = await fetch(testUrl);
-            
-            if (response.ok) {
-                // Save the API key
-                await chrome.storage.local.set({ pixabayApiKey: apiKey });
-                showStatus(apiKeyStatus, 'API key saved successfully!', 'success');
-                apiKeyInput.value = '••••••••••••••••';
-            } else {
-                const errorData = await response.json();
-                showStatus(apiKeyStatus, `Invalid API key: ${errorData.error || 'Unknown error'}`, 'error');
-            }
-        } catch (error) {
-            console.error('Error testing API key:', error);
-            showStatus(apiKeyStatus, 'Error validating API key. Please check your connection.', 'error');
-        }
+    } catch (error) {
+        console.error('Error checking current page:', error);
+        updateStatusMessage('?', 'Error checking page', 'error');
+    }
+}
+
+function extractUsernameFromUrl(url) {
+    const match = url.match(/\/users\/([^\/\?]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+function updateStatusMessage(icon, message, type = '') {
+    document.getElementById('statusIcon').textContent = icon;
+    document.getElementById('statusMessage').textContent = message;
+    
+    const statusSection = document.querySelector('.status-section');
+    statusSection.className = `status-section ${type}`;
+}
+
+function showApiKeySection() {
+    document.getElementById('apiKeySection').classList.remove('hidden');
+    document.getElementById('downloadSection').classList.add('hidden');
+    updateStatusMessage('??', 'API key required to continue', 'warning');
+}
+
+function showDownloadSection(username) {
+    document.getElementById('downloadSection').classList.remove('hidden');
+    document.getElementById('apiKeySection').classList.add('hidden');
+    document.getElementById('currentUser').textContent = username;
+}
+
+async function saveApiKey() {
+    const apiKeyInput = document.getElementById('apiKeyInput');
+    const saveBtn = document.getElementById('saveApiKeyBtn');
+    const apiKey = apiKeyInput.value.trim();
+    
+    if (!apiKey) {
+        updateStatusMessage('??', 'Please enter an API key', 'warning');
+        return;
     }
     
-    async function checkCurrentTab() {
-        try {
-            const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            
-            if (activeTab.url.includes('pixabay.com/users/')) {
-                const username = extractUsernameFromUrl(activeTab.url);
-                extensionStatus.innerHTML = `
-                    <p style="color: #28a745;">? Ready to download from user: <strong>${username}</strong></p>
-                    <p style="font-size: 12px; opacity: 0.8;">Download buttons should appear on the user's profile page.</p>
-                `;
-            } else if (activeTab.url.includes('pixabay.com')) {
-                extensionStatus.innerHTML = `
-                    <p style="color: #ffc107;">?? You're on Pixabay but not on a user profile page.</p>
-                    <p style="font-size: 12px; opacity: 0.8;">Navigate to a user's profile to use the mass downloader.</p>
-                `;
-            } else {
-                extensionStatus.innerHTML = `
-                    <p style="color: #6c757d;">?? Navigate to a Pixabay user profile to use the downloader.</p>
-                    <p style="font-size: 12px; opacity: 0.8;">Example: pixabay.com/users/username/</p>
-                `;
-            }
-        } catch (error) {
-            console.error('Error checking current tab:', error);
-            extensionStatus.innerHTML = `
-                <p style="color: #dc3545;">? Unable to check current tab status.</p>
-            `;
-        }
-    }
+    // Show loading
+    saveBtn.innerHTML = '<div class="spinner"></div> Validating...';
+    saveBtn.disabled = true;
     
-    function extractUsernameFromUrl(url) {
-        const match = url.match(/\/users\/([^\/\?]+)/);
-        return match ? match[1] : 'Unknown';
-    }
-    
-    function showStatus(element, message, type) {
-        element.innerHTML = `<div class="status ${type}">${message}</div>`;
+    try {
+        // Quick validation
+        const isValid = await validateApiKey(apiKey);
         
-        // Clear status after 5 seconds for non-success messages
-        if (type !== 'success') {
+        if (isValid) {
+            await chrome.storage.local.set({ pixabayApiKey: apiKey });
+            updateStatusMessage('?', 'API key saved successfully!', 'success');
+            apiKeyInput.value = '';
+            
+            // Check current page again
             setTimeout(() => {
-                element.innerHTML = '';
-            }, 5000);
+                checkCurrentPage();
+            }, 1000);
+            
+        } else {
+            updateStatusMessage('?', 'Invalid API key. Please check and try again.', 'error');
         }
+        
+    } catch (error) {
+        console.error('Error saving API key:', error);
+        updateStatusMessage('?', 'Error validating API key', 'error');
+    } finally {
+        saveBtn.innerHTML = 'Save Key';
+        saveBtn.disabled = false;
+    }
+}
+
+async function validateApiKey(apiKey) {
+    try {
+        const testUrl = `https://pixabay.com/api/?key=${apiKey}&per_page=3`;
+        const response = await fetch(testUrl);
+        return response.ok;
+    } catch (error) {
+        console.error('API validation error:', error);
+        return false;
+    }
+}
+
+async function startDownload(contentType) {
+    if (!currentUsername || isDownloading) return;
+    
+    isDownloading = true;
+    const downloadBtn = document.querySelector(`[data-type="${contentType}"]`);
+    const originalText = downloadBtn.innerHTML;
+    
+    try {
+        // Show progress
+        showProgress();
+        downloadBtn.innerHTML = '<div class="spinner"></div> Starting...';
+        downloadBtn.disabled = true;
+        
+        // Get API key
+        const result = await chrome.storage.local.get(['pixabayApiKey']);
+        const apiKey = result.pixabayApiKey;
+        
+        if (!apiKey) {
+            throw new Error('No API key found');
+        }
+        
+        // Send message to background script to start download
+        await chrome.runtime.sendMessage({
+            action: 'START_DOWNLOAD',
+            username: currentUsername,
+            contentType: contentType,
+            apiKey: apiKey
+        });
+        
+        updateStatusMessage('??', `Starting download of ${contentType} from ${currentUsername}...`, 'success');
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
+        hideProgress();
+    } finally {
+        downloadBtn.innerHTML = originalText;
+        downloadBtn.disabled = false;
+        isDownloading = false;
+    }
+}
+
+function showProgress() {
+    document.getElementById('progressSection').classList.remove('hidden');
+    updateProgress(0, 0);
+}
+
+function hideProgress() {
+    document.getElementById('progressSection').classList.add('hidden');
+}
+
+function updateProgress(current, total) {
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    
+    if (total > 0) {
+        const percentage = (current / total) * 100;
+        progressFill.style.width = `${percentage}%`;
+        progressText.textContent = `${current} / ${total} downloaded`;
+    } else {
+        progressFill.style.width = '0%';
+        progressText.textContent = 'Preparing download...';
+    }
+}
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch (message.action) {
+        case 'UPDATE_PROGRESS':
+            updateProgress(message.current, message.total);
+            break;
+            
+        case 'DOWNLOAD_COMPLETE':
+            updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
+            hideProgress();
+            isDownloading = false;
+            break;
+            
+        case 'DOWNLOAD_ERROR':
+            updateStatusMessage('?', `Download error: ${message.error}`, 'error');
+            hideProgress();
+            isDownloading = false;
+            break;
+            
+        case 'DOWNLOAD_STARTED':
+            updateStatusMessage('??', `Downloading ${message.contentType} from ${message.username}...`, 'success');
+            break;
     }
 });
 
-// Handle messages from background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    const extensionStatus = document.getElementById('extensionStatus');
-    
-    if (message.action === 'DOWNLOAD_STARTED') {
-        extensionStatus.innerHTML = `
-            <p style="color: #007bff;">?? Download started for ${message.username}</p>
-            <p style="font-size: 12px; opacity: 0.8;">Check the user profile page for progress updates.</p>
-        `;
-    } else if (message.action === 'DOWNLOAD_COMPLETE') {
-        extensionStatus.innerHTML = `
-            <p style="color: #28a745;">? Download completed!</p>
-            <p style="font-size: 12px; opacity: 0.8;">${message.count} files downloaded successfully.</p>
-        `;
+// Refresh status when popup is opened
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        setTimeout(checkCurrentPage, 100);
     }
 });

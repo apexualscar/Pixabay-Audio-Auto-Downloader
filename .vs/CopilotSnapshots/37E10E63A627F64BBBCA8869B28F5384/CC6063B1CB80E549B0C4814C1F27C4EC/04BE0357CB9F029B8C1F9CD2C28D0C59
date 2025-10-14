@@ -1,0 +1,126 @@
+﻿/* Styles for the mass downloader interface */
+.pixabay-mass-downloader-container {
+    background: #f8f9fa;
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.mass-download-section h3 {
+    color: #f8f9fa;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.download-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.mass-download-btn {
+    background: linear-gradient(135deg, #28a745, #f8f9fa);
+    color: black;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.mass-download-btn:hover {
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.mass-download-btn:active {
+    transform: translateY(0);
+}
+
+.api-key-section {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.api-key-section input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.api-key-section button {
+    background: #28a745;
+    color: black;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.api-key-section button:hover {
+    background: #218838;
+}
+
+.progress-section {
+    background: #e9ecef;
+    border-radius: 6px;
+    padding: 15px;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    background: #218838;
+    border-radius: 10px;
+    height: 20px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.progress-fill {
+    background: linear-gradient(90deg, #28a745, #20c997);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+    border-radius: 10px;
+}
+
+.progress-text {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #495057;
+}
+
+@media (max-width: 768px) {
+    .pixabay-mass-downloader-container {
+        margin: 10px;
+        padding: 15px;
+    }
+    
+    .download-options {
+        gap: 8px;
+    }
+    
+    .mass-download-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+}

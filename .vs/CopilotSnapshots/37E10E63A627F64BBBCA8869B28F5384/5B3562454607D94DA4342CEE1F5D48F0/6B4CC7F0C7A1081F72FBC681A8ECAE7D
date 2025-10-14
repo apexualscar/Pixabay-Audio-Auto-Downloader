@@ -1,0 +1,196 @@
+﻿// JavaScript functions for file downloading and Chrome extension integration
+
+window.downloadFile = (url, filename) => {
+    return new Promise((resolve, reject) => {
+        try {
+            // Create a temporary anchor element
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+            
+            // Add to DOM, click, and remove
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            resolve();
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
+window.downloadBlob = (data, filename, mimeType) => {
+    const blob = new Blob([data], { type: mimeType });
+    const url = window.URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up the URL object
+    window.URL.revokeObjectURL(url);
+};
+
+window.downloadFromUrl = async (url, filename) => {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const blob = await response.blob();
+        const objectUrl = window.URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up
+        window.URL.revokeObjectURL(objectUrl);
+        
+        return true;
+    } catch (error) {
+        console.error('Download failed:', error);
+        throw error;
+    }
+};
+
+// Chrome extension specific functions
+window.chromeExtension = {
+    isAvailable: () => {
+        return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+    },
+    
+    sendMessage: (message) => {
+        if (window.chromeExtension.isAvailable()) {
+            return new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage(message, (response) => {
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve(response);
+                    }
+                });
+            });
+        } else {
+            return Promise.reject(new Error('Chrome extension not available'));
+        }
+    },
+    
+    getCurrentTab: () => {
+        if (window.chromeExtension.isAvailable()) {
+            return new Promise((resolve) => {
+                chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                    resolve(tabs[0]);
+                });
+            });
+        } else {
+            return Promise.resolve(null);
+        }
+    }
+};
+
+// Storage helpers for the web app (fallback when not in extension context)
+window.secureStorage = {
+    getItem: (key) => {
+        try {
+            return localStorage.getItem(key);
+        } catch (error) {
+            console.error('Error reading from storage:', error);
+            return null;
+        }
+    },
+    
+    setItem: (key, value) => {
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        } catch (error) {
+            console.error('Error writing to storage:', error);
+            return false;
+        }
+    },
+    
+    removeItem: (key) => {
+        try {
+            localStorage.removeItem(key);
+            return true;
+        } catch (error) {
+            console.error('Error removing from storage:', error);
+            return false;
+        }
+    }
+};
+
+// Progress tracking for downloads
+window.downloadProgress = {
+    current: 0,
+    total: 0,
+    callbacks: [],
+    
+    update: (current, total) => {
+        window.downloadProgress.current = current;
+        window.downloadProgress.total = total;
+        
+        // Notify all callbacks
+        window.downloadProgress.callbacks.forEach(callback => {
+            try {
+                callback(current, total);
+            } catch (error) {
+                console.error('Error in progress callback:', error);
+            }
+        });
+    },
+    
+    addCallback: (callback) => {
+        window.downloadProgress.callbacks.push(callback);
+    },
+    
+    removeCallback: (callback) => {
+        const index = window.downloadProgress.callbacks.indexOf(callback);
+        if (index > -1) {
+            window.downloadProgress.callbacks.splice(index, 1);
+        }
+    },
+    
+    reset: () => {
+        window.downloadProgress.current = 0;
+        window.downloadProgress.total = 0;
+    }
+};
+
+// Utility functions
+window.utils = {
+    sleep: (ms) => new Promise(resolve => setTimeout(resolve, ms)),
+    
+    generateFilename: (originalUrl, prefix = '', extension = '') => {
+        const url = new URL(originalUrl);
+        const pathname = url.pathname;
+        const filename = pathname.split('/').pop() || 'download';
+        const name = filename.split('.')[0];
+        const ext = extension || filename.split('.').pop() || '';
+        
+        return `${prefix}${name}.${ext}`;
+    },
+    
+    validateApiKey: (apiKey) => {
+        return apiKey && typeof apiKey === 'string' && apiKey.length > 10;
+    },
+    
+    extractUsernameFromUrl: (url) => {
+        const match = url.match(/\/users\/([^\/\?]+)/);
+        return match ? match[1] : null;
+    }
+};

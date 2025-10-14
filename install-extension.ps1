@@ -29,13 +29,27 @@ foreach ($file in $requiredFiles) {
 if ($missingFiles.Count -eq 0) {
     Write-Host "`n? All required files are present!" -ForegroundColor Green
     
+    Write-Host "`n?? NEW IMPROVED WORKFLOW:" -ForegroundColor Cyan
+    Write-Host "1. The extension popup now opens instantly!" -ForegroundColor White
+    Write-Host "2. All downloads are controlled from the popup" -ForegroundColor White
+    Write-Host "3. Downloads are organized in folders: username_contenttype" -ForegroundColor White
+    Write-Host "4. Files are named: user_id_description.ext" -ForegroundColor White
+    
     Write-Host "`nTo install the Chrome extension:" -ForegroundColor Cyan
     Write-Host "1. Open Chrome and go to chrome://extensions/" -ForegroundColor White
     Write-Host "2. Enable 'Developer mode' in the top right" -ForegroundColor White
     Write-Host "3. Click 'Load unpacked' and select this folder" -ForegroundColor White
     Write-Host "4. The extension should appear in your extensions list" -ForegroundColor White
     
-    Write-Host "`nTo use the web application:" -ForegroundColor Cyan
+    Write-Host "`nHow to use:" -ForegroundColor Cyan
+    Write-Host "1. Get your Pixabay API key from pixabay.com/api/docs/" -ForegroundColor White
+    Write-Host "2. Visit any Pixabay user profile (pixabay.com/users/username)" -ForegroundColor White
+    Write-Host "3. Click the extension icon in your toolbar" -ForegroundColor White
+    Write-Host "4. Enter your API key (first time only)" -ForegroundColor White
+    Write-Host "5. Click the download button for the content type you want" -ForegroundColor White
+    Write-Host "6. Files will download to: Downloads/username_contenttype/" -ForegroundColor White
+    
+    Write-Host "`nTo run the web application:" -ForegroundColor Cyan
     Write-Host "1. Run: dotnet run --project Pixabay-Mass-Audio-Downloader" -ForegroundColor White
     Write-Host "2. Open your browser to the displayed URL" -ForegroundColor White
     Write-Host "3. Navigate to the Mass Downloader page" -ForegroundColor White
@@ -47,5 +61,14 @@ if ($missingFiles.Count -eq 0) {
     }
     Write-Host "`nPlease ensure all files are present before installing the extension." -ForegroundColor Yellow
 }
+
+Write-Host "`n?? File Structure:" -ForegroundColor Cyan
+Write-Host "Downloads will be organized as:" -ForegroundColor White
+Write-Host "  ?? Downloads/" -ForegroundColor Gray
+Write-Host "    ?? username_photo/" -ForegroundColor Gray
+Write-Host "      ?? user_12345_landscape.jpg" -ForegroundColor Gray
+Write-Host "      ?? user_12346_sunset.jpg" -ForegroundColor Gray
+Write-Host "    ?? username_music/" -ForegroundColor Gray
+Write-Host "      ?? user_12347_piano.mp3" -ForegroundColor Gray
 
 Write-Host "`nFor more information, see EXTENSION_README.md" -ForegroundColor Cyan

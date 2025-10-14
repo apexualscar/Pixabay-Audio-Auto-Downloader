@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Pixabay-Mass-Audio-Downloader")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7f5eb12281d2f5d6c5c4f2692d9c0b14454c30ef")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+803839c815e4f40f98b84cc33104aaf47dc91b53")]
 [assembly: System.Reflection.AssemblyProductAttribute("Pixabay-Mass-Audio-Downloader")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Pixabay-Mass-Audio-Downloader")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

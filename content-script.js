@@ -1,4 +1,4 @@
-// Content script that runs on Pixabay user pages
+// Simplified content script - mainly for visual feedback
 console.log('Pixabay Mass Downloader content script loaded');
 
 // Wait for the page to load
@@ -17,169 +17,184 @@ function initializeExtension() {
         const username = match[1];
         console.log(`Found user profile: ${username}`);
         
-        // Add the download button to the page
-        addDownloadButton(username);
+        // Add a subtle indicator that the extension is active
+        addExtensionIndicator(username);
     }
 }
 
-function addDownloadButton(username) {
-    // Find a suitable location to add the button (user stats area)
-    const userStatsContainer = document.querySelector('.user_stats') || 
-                              document.querySelector('.profile-stats') ||
-                              document.querySelector('[data-testid="user-stats"]');
+function addExtensionIndicator(username) {
+    // Find a suitable location to add a small indicator
+    const userHeader = document.querySelector('.user-header, .profile-header, h1') || 
+                      document.querySelector('[data-testid="user-header"]') ||
+                      document.querySelector('main h1');
     
-    if (userStatsContainer) {
-        // Create the download button container
-        const buttonContainer = document.createElement('div');
-        buttonContainer.className = 'pixabay-mass-downloader-container';
-        buttonContainer.innerHTML = `
-            <div class="mass-download-section">
-                <h3>Mass Download</h3>
-                <div class="download-options">
-                    <button id="download-images" class="mass-download-btn" data-type="photo">
-                        ?? Download All Images
-                    </button>
-                    <button id="download-sounds" class="mass-download-btn" data-type="music">
-                        ?? Download All Sounds
-                    </button>
-                    <button id="download-videos" class="mass-download-btn" data-type="video">
-                        ?? Download All Videos
-                    </button>
-                </div>
-                <div class="api-key-section" style="display: none;">
-                    <input type="password" id="pixabay-api-key" placeholder="Enter your Pixabay API key">
-                    <button id="save-api-key">Save API Key</button>
-                </div>
-                <div class="progress-section" style="display: none;">
-                    <div class="progress-bar">
-                        <div class="progress-fill"></div>
-                    </div>
-                    <div class="progress-text">0 / 0 downloaded</div>
-                </div>
+    if (userHeader) {
+        // Create a small, unobtrusive indicator
+        const indicator = document.createElement('div');
+        indicator.className = 'pixabay-mass-downloader-indicator';
+        indicator.innerHTML = `
+            <div style="
+                display: inline-flex;
+                align-items: center;
+                background: linear-gradient(135deg, #007bff, #0056b3);
+                color: white;
+                padding: 4px 8px;
+                border-radius: 12px;
+                font-size: 11px;
+                font-weight: 500;
+                margin-left: 8px;
+                box-shadow: 0 2px 4px rgba(0,123,255,0.3);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            " title="Click the extension icon to download all content from this user">
+                ?? Mass Downloader Ready
             </div>
         `;
         
-        // Insert the button container
-        userStatsContainer.appendChild(buttonContainer);
-        
-        // Add event listeners
-        setupEventListeners(username);
-    }
-}
-
-function setupEventListeners(username) {
-    const downloadButtons = document.querySelectorAll('.mass-download-btn');
-    
-    downloadButtons.forEach(button => {
-        button.addEventListener('click', async (e) => {
-            const contentType = e.target.dataset.type;
-            await initiateDownload(username, contentType);
+        // Add hover effect
+        const indicatorElement = indicator.querySelector('div');
+        indicatorElement.addEventListener('mouseenter', () => {
+            indicatorElement.style.transform = 'translateY(-1px)';
+            indicatorElement.style.boxShadow = '0 4px 8px rgba(0,123,255,0.4)';
         });
-    });
-    
-    // API key save button
-    const saveApiKeyBtn = document.getElementById('save-api-key');
-    if (saveApiKeyBtn) {
-        saveApiKeyBtn.addEventListener('click', saveApiKey);
-    }
-}
-
-async function initiateDownload(username, contentType) {
-    // Check if API key exists
-    const apiKey = await getStoredApiKey();
-    
-    if (!apiKey) {
-        showApiKeyInput();
-        return;
-    }
-    
-    // Send message to background script to start download
-    chrome.runtime.sendMessage({
-        action: 'START_DOWNLOAD',
-        username: username,
-        contentType: contentType,
-        apiKey: apiKey
-    });
-    
-    showProgressSection();
-}
-
-async function getStoredApiKey() {
-    return new Promise((resolve) => {
-        chrome.storage.secure ? 
-            chrome.storage.secure.get(['pixabayApiKey'], (result) => {
-                resolve(result.pixabayApiKey);
-            }) :
-            chrome.storage.local.get(['pixabayApiKey'], (result) => {
-                resolve(result.pixabayApiKey);
-            });
-    });
-}
-
-function saveApiKey() {
-    const apiKeyInput = document.getElementById('pixabay-api-key');
-    const apiKey = apiKeyInput.value.trim();
-    
-    if (apiKey) {
-        // Store API key securely
-        chrome.storage.secure ? 
-            chrome.storage.secure.set({ pixabayApiKey: apiKey }) :
-            chrome.storage.local.set({ pixabayApiKey: apiKey });
         
-        document.querySelector('.api-key-section').style.display = 'none';
-        alert('API key saved successfully!');
+        indicatorElement.addEventListener('mouseleave', () => {
+            indicatorElement.style.transform = 'translateY(0)';
+            indicatorElement.style.boxShadow = '0 2px 4px rgba(0,123,255,0.3)';
+        });
+        
+        // Add click handler to open extension popup
+        indicatorElement.addEventListener('click', () => {
+            // Show a message encouraging user to click the extension icon
+            showPopupReminder();
+        });
+        
+        // Insert the indicator
+        if (userHeader.tagName === 'H1') {
+            userHeader.appendChild(indicator);
+        } else {
+            userHeader.insertBefore(indicator, userHeader.firstChild);
+        }
     }
 }
 
-function showApiKeyInput() {
-    document.querySelector('.api-key-section').style.display = 'block';
-}
-
-function showProgressSection() {
-    document.querySelector('.progress-section').style.display = 'block';
-}
-
-// Listen for progress updates from background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.action === 'UPDATE_PROGRESS') {
-        updateProgress(message.current, message.total);
-    } else if (message.action === 'DOWNLOAD_COMPLETE') {
-        downloadComplete(message.count);
-    } else if (message.action === 'DOWNLOAD_ERROR') {
-        downloadError(message.error);
-    }
-});
-
-function updateProgress(current, total) {
-    const progressFill = document.querySelector('.progress-fill');
-    const progressText = document.querySelector('.progress-text');
+function showPopupReminder() {
+    // Create a temporary tooltip
+    const tooltip = document.createElement('div');
+    tooltip.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: fadeInOut 3s ease-in-out forwards;
+        ">
+            ?? Click the Pixabay Downloader extension icon in your browser toolbar to download content!
+        </div>
+        <style>
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translateY(-10px); }
+                20% { opacity: 1; transform: translateY(0); }
+                80% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-10px); }
+            }
+        </style>
+    `;
     
-    if (progressFill && progressText) {
-        const percentage = (current / total) * 100;
-        progressFill.style.width = `${percentage}%`;
-        progressText.textContent = `${current} / ${total} downloaded`;
-    }
-}
-
-function downloadComplete(count) {
-    const progressText = document.querySelector('.progress-text');
-    if (progressText) {
-        progressText.textContent = `Download complete! ${count} files downloaded.`;
-    }
+    document.body.appendChild(tooltip);
     
-    // Hide progress section after 3 seconds
+    // Remove after animation
     setTimeout(() => {
-        const progressSection = document.querySelector('.progress-section');
-        if (progressSection) {
-            progressSection.style.display = 'none';
+        if (tooltip.parentNode) {
+            tooltip.parentNode.removeChild(tooltip);
         }
     }, 3000);
 }
 
-function downloadError(error) {
-    alert(`Download error: ${error}`);
-    const progressSection = document.querySelector('.progress-section');
-    if (progressSection) {
-        progressSection.style.display = 'none';
+// Listen for messages from background script for progress updates
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch (message.action) {
+        case 'DOWNLOAD_STARTED':
+            showProgressNotification(`Starting download of ${message.contentType} from ${message.username}...`, 'info');
+            break;
+            
+        case 'UPDATE_PROGRESS':
+            showProgressNotification(`Downloaded ${message.current} / ${message.total} files`, 'progress');
+            break;
+            
+        case 'DOWNLOAD_COMPLETE':
+            showProgressNotification(`? Download complete! ${message.count} files downloaded successfully.`, 'success');
+            break;
+            
+        case 'DOWNLOAD_ERROR':
+            showProgressNotification(`? Download error: ${message.error}`, 'error');
+            break;
+    }
+});
+
+function showProgressNotification(message, type = 'info') {
+    // Remove existing notification
+    const existing = document.querySelector('.pixabay-downloader-notification');
+    if (existing) {
+        existing.remove();
+    }
+    
+    // Create new notification
+    const notification = document.createElement('div');
+    notification.className = 'pixabay-downloader-notification';
+    
+    const bgColor = {
+        'info': '#007bff',
+        'progress': '#28a745',
+        'success': '#28a745',
+        'error': '#dc3545'
+    }[type] || '#007bff';
+    
+    notification.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${bgColor};
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            max-width: 300px;
+            animation: slideIn 0.3s ease-out;
+        ">
+            ${message}
+        </div>
+        <style>
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        </style>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after delay (except for progress messages)
+    if (type !== 'progress') {
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.animation = 'slideIn 0.3s ease-out reverse';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }
+        }, type === 'error' ? 5000 : 3000);
     }
 }
