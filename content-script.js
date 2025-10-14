@@ -1,5 +1,5 @@
-// Content script for Pixabay Mass Downloader - Web Scraping Version
-console.log('Pixabay Mass Downloader content script loaded');
+// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
+console.log('Pixabay Sound Effects Downloader content script loaded');
 
 let isContentScriptActive = false;
 let scrapingInProgress = false;
@@ -8,12 +8,12 @@ let scrapingInProgress = false;
 function initializeContentScript() {
     if (isContentScriptActive) return;
     
-    console.log('Initializing Pixabay content script...');
+    console.log('Initializing Pixabay sound effects content script...');
     isContentScriptActive = true;
     
-    // Check if we're on a user profile page
-    if (window.location.pathname.includes('/users/')) {
-        console.log('User profile page detected');
+    // Check if we're on a Pixabay page
+    if (window.location.hostname.includes('pixabay.com')) {
+        console.log('Pixabay page detected');
         
         // Add visual indicators that scraping is available
         addScrapingIndicators();
@@ -26,13 +26,13 @@ function initializeContentScript() {
 function addScrapingIndicators() {
     // Add a subtle indicator that the scraper is active
     const indicator = document.createElement('div');
-    indicator.id = 'pixabay-scraper-indicator';
+    indicator.id = 'pixabay-sound-scraper-indicator';
     indicator.innerHTML = `
         <div style="
             position: fixed;
             top: 10px;
             right: 10px;
-            background: #4bc24b;
+            background: #17a2b8;
             color: white;
             padding: 8px 12px;
             border-radius: 20px;
@@ -42,7 +42,7 @@ function addScrapingIndicators() {
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         ">
-            ?? Scraper Ready
+            ?? Audio Scraper Ready
         </div>
     `;
     
@@ -50,7 +50,7 @@ function addScrapingIndicators() {
     
     // Auto-hide after 3 seconds
     setTimeout(() => {
-        const el = document.getElementById('pixabay-scraper-indicator');
+        const el = document.getElementById('pixabay-sound-scraper-indicator');
         if (el) {
             el.style.opacity = '0';
             el.style.transition = 'opacity 0.5s ease';
@@ -63,41 +63,25 @@ function handleBackgroundMessage(message, sender, sendResponse) {
     console.log('Content script received message:', message);
     
     switch (message.action) {
-        case 'SCRAPE_CONTENT':
-            scrapeContent(message.category, message.username);
-            break;
-        case 'NAVIGATE_TO_CATEGORY':
-            navigateToCategory(message.category, message.username);
-            break;
-        case 'EXTRACT_DOWNLOAD_LINKS':
-            extractDownloadLinks(message.category);
+        case 'SCAN_SOUND_EFFECTS':
+            scanSoundEffectsFromCurrentPage();
             break;
     }
 }
 
-async function scrapeContent(category, username) {
+async function scanSoundEffectsFromCurrentPage() {
     if (scrapingInProgress) {
-        console.log('Scraping already in progress');
+        console.log('Scanning already in progress');
         return;
     }
     
     scrapingInProgress = true;
     
     try {
-        console.log(`Starting to scrape ${category} content for ${username}`);
+        console.log('Starting to scan sound effects from current page...');
         
-        // Show scraping indicator
-        showScrapingProgress(`Scraping ${category}...`);
-        
-        // First, navigate to the correct category page if needed
-        const categoryUrl = getCategoryUrl(category, username);
-        
-        if (!window.location.href.includes(categoryUrl)) {
-            console.log(`Navigating to ${categoryUrl}`);
-            showScrapingProgress(`Navigating to ${category} page...`);
-            window.location.href = categoryUrl;
-            return; // Page will reload, script will continue after navigation
-        }
+        // Show scanning indicator
+        showScrapingProgress('Scanning for sound effects...');
         
         // Wait for page to load completely
         await waitForPageLoad();
@@ -105,26 +89,24 @@ async function scrapeContent(category, username) {
         // Scroll to load all content
         await scrollToLoadAll();
         
-        // Extract content items
-        const contentItems = await extractContentItems(category);
+        // Extract sound effects using specific selectors
+        const soundEffects = await extractSoundEffectsWithProgress();
         
-        console.log(`Found ${contentItems.length} ${category} items`);
+        console.log(`Successfully extracted ${soundEffects.length} sound effects`);
         
         // Send results back to background script
         chrome.runtime.sendMessage({
-            action: 'CONTENT_SCRAPED',
-            category: category,
-            username: username,
-            items: contentItems
+            action: 'SOUND_EFFECTS_EXTRACTED',
+            items: soundEffects
         });
         
         hideScrapingProgress();
         
     } catch (error) {
-        console.error('Error scraping content:', error);
+        console.error('Error scanning sound effects:', error);
         hideScrapingProgress();
         chrome.runtime.sendMessage({
-            action: 'SCRAPING_ERROR',
+            action: 'SCANNING_ERROR',
             error: error.message
         });
     } finally {
@@ -132,235 +114,256 @@ async function scrapeContent(category, username) {
     }
 }
 
-function getCategoryUrl(category, username) {
-    const categoryPaths = {
-        'photos': '',
-        'illustrations': 'illustrations/',
-        'vectors': 'vectors/',
-        'videos': 'videos/',
-        'music': 'music/',
-        'sound-effects': 'sound-effects/',
-        'gifs': 'gifs/'
-    };
-    
-    const path = categoryPaths[category] || '';
-    return `https://pixabay.com/users/${username}/${path}`;
-}
-
 function waitForPageLoad() {
     return new Promise((resolve) => {
         if (document.readyState === 'complete') {
-            setTimeout(resolve, 1000); // Extra delay for dynamic content
+            setTimeout(resolve, 2000); // Extra delay for dynamic content
         } else {
             window.addEventListener('load', () => {
-                setTimeout(resolve, 1000);
+                setTimeout(resolve, 2000);
             });
         }
     });
 }
 
 async function scrollToLoadAll() {
-    console.log('Scrolling to load all content...');
+    console.log('Scrolling to load all sound effects...');
     
     return new Promise((resolve) => {
         let scrollCount = 0;
-        const maxScrolls = 50; // Prevent infinite scrolling
+        let lastItemCount = 0;
+        let stableCount = 0;
+        const maxScrolls = 50; // Reduced since we're looking for specific elements
         
         function scrollStep() {
-            const scrollHeight = document.documentElement.scrollHeight;
-            const scrollTop = document.documentElement.scrollTop;
-            const clientHeight = document.documentElement.clientHeight;
+            // Count current sound effect items
+            const currentItemCount = countSoundEffectsOnCurrentPage();
+            
+            // Check if new items loaded
+            if (currentItemCount === lastItemCount) {
+                stableCount++;
+            } else {
+                stableCount = 0;
+                lastItemCount = currentItemCount;
+                console.log(`Found ${currentItemCount} sound effects after scroll ${scrollCount}`);
+                
+                // Update progress
+                showScrapingProgress(`Loading sound effects... Found ${currentItemCount} items`);
+            }
+            
+            // Stop if no new items for 3 consecutive scrolls or max scrolls reached
+            if (stableCount >= 3 || scrollCount >= maxScrolls) {
+                console.log(`Scrolling complete. Final count: ${currentItemCount} sound effects`);
+                window.scrollTo(0, 0); // Scroll back to top
+                setTimeout(resolve, 2000);
+                return;
+            }
             
             // Scroll down
             window.scrollBy(0, 1000);
             scrollCount++;
             
-            // Check if we've reached the bottom or max scrolls
-            if (scrollTop + clientHeight >= scrollHeight - 100 || scrollCount >= maxScrolls) {
-                console.log(`Scrolling complete. Total scrolls: ${scrollCount}`);
-                // Scroll back to top
-                window.scrollTo(0, 0);
-                setTimeout(resolve, 2000); // Wait for final content to load
-            } else {
-                setTimeout(scrollStep, 1000); // Wait 1 second between scrolls
-            }
+            setTimeout(scrollStep, 1000); // Wait between scrolls
         }
         
         scrollStep();
     });
 }
 
-async function extractContentItems(category) {
-    console.log(`Extracting ${category} items...`);
+function countSoundEffectsOnCurrentPage() {
+    // Count items using the specific selector you provided
+    const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+    return audioRows.length;
+}
+
+async function extractSoundEffectsWithProgress() {
+    console.log('Extracting sound effects using specific selectors...');
+    showScrapingProgress('Analyzing sound effects...');
     
-    const items = [];
+    const soundEffects = [];
     
-    // Common selectors for different content types
-    const selectors = {
-        container: [
-            'div[data-testid="media-item"]',
-            '.item',
-            '.media-item',
-            '.photo-item',
-            '.video-item',
+    // Use the specific selectors you mentioned
+    const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+    console.log(`Found ${audioRows.length} audio rows with class "audioRow--nAm4Z"`);
+    
+    if (audioRows.length === 0) {
+        console.log('No audio rows found, trying alternative selectors...');
+        
+        // Try alternative selectors as fallback
+        const alternativeSelectors = [
+            '[class*="audioRow"]',
+            '[class*="audio-row"]',
+            '[class*="sound-row"]',
             '.audio-item',
-            'article',
-            '.grid-item'
-        ],
-        downloadButton: [
-            'a[href*="/download/"]',
-            'button[aria-label*="download"]',
-            '.download-btn',
-            'a[data-track-action="download"]',
-            'button[data-track-action="download"]',
-            'a[href*="download"]'
-        ],
-        image: [
-            'img[src*="pixabay"]',
-            'img[data-src*="pixabay"]',
-            'img'
-        ],
-        title: [
-            'img[alt]',
-            '.title',
-            'h3',
-            '.item-title',
-            '.media-title'
-        ]
-    };
-    
-    // Find all content containers
-    let containers = [];
-    for (const selector of selectors.container) {
-        containers = document.querySelectorAll(selector);
-        if (containers.length > 0) {
-            console.log(`Found ${containers.length} items using selector: ${selector}`);
-            break;
+            '.sound-item',
+            '.media-item[data-type="audio"]'
+        ];
+        
+        for (const selector of alternativeSelectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                console.log(`Found ${elements.length} items using fallback selector: ${selector}`);
+                elements.forEach(element => audioRows.push ? null : audioRows.push(element));
+                break;
+            }
         }
     }
     
-    if (containers.length === 0) {
-        console.log('No content containers found, trying alternative approach...');
-        // Fallback: look for images directly
-        const images = document.querySelectorAll('img[src*="pixabay"], img[data-src*="pixabay"]');
-        console.log(`Found ${images.length} images as fallback`);
+    // Process each audio row
+    for (let i = 0; i < audioRows.length; i++) {
+        const audioRow = audioRows[i];
         
-        images.forEach((img, index) => {
-            if (img.src && img.src.includes('pixabay')) {
-                const item = extractItemFromImage(img, index, category);
-                if (item) items.push(item);
+        try {
+            const soundEffect = extractSoundEffectFromRow(audioRow, i);
+            if (soundEffect) {
+                soundEffects.push(soundEffect);
+                
+                // Update progress every 10 items
+                if (soundEffects.length % 10 === 0) {
+                    showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
+                }
             }
-        });
-    } else {
-        // Process each container
-        containers.forEach((container, index) => {
-            const item = extractItemFromContainer(container, index, category, selectors);
-            if (item) items.push(item);
-        });
+        } catch (error) {
+            console.error(`Error processing audio row ${i}:`, error);
+        }
     }
     
-    console.log(`Extracted ${items.length} ${category} items`);
-    return items;
+    console.log(`Successfully extracted ${soundEffects.length} sound effects`);
+    return soundEffects;
 }
 
-function extractItemFromContainer(container, index, category, selectors) {
+function extractSoundEffectFromRow(audioRow, index) {
     try {
-        // Find download button
-        let downloadUrl = '';
-        for (const selector of selectors.downloadButton) {
-            const downloadBtn = container.querySelector(selector);
-            if (downloadBtn) {
-                downloadUrl = downloadBtn.href || downloadBtn.getAttribute('data-href') || '';
-                if (downloadUrl) break;
-            }
-        }
-        
-        // Find image/preview
-        let previewUrl = '';
-        for (const selector of selectors.image) {
-            const img = container.querySelector(selector);
-            if (img) {
-                previewUrl = img.src || img.getAttribute('data-src') || '';
-                if (previewUrl && previewUrl.includes('pixabay')) break;
-            }
-        }
-        
-        // Find title
+        // Find the title using the specific selector you mentioned
+        const nameAndTitleEl = audioRow.querySelector('.nameAndTitle--KcBAZ');
         let title = '';
-        for (const selector of selectors.title) {
-            const titleEl = container.querySelector(selector);
-            if (titleEl) {
-                title = titleEl.alt || titleEl.textContent || titleEl.innerText || '';
-                if (title.trim()) break;
+        
+        if (nameAndTitleEl) {
+            title = nameAndTitleEl.textContent?.trim() || '';
+            console.log(`Found title using nameAndTitle selector: "${title}"`);
+        }
+        
+        // If no title found with specific selector, try alternatives
+        if (!title) {
+            const titleSelectors = [
+                '.title',
+                '.name',
+                '.track-name',
+                '.audio-title',
+                'h3',
+                'h4',
+                '[class*="title"]',
+                '[class*="name"]'
+            ];
+            
+            for (const selector of titleSelectors) {
+                const titleEl = audioRow.querySelector(selector);
+                if (titleEl && titleEl.textContent?.trim()) {
+                    title = titleEl.textContent.trim();
+                    console.log(`Found title using fallback selector "${selector}": "${title}"`);
+                    break;
+                }
             }
         }
         
-        // Extract ID from various sources
-        let itemId = container.id || 
-                    container.getAttribute('data-id') ||
-                    extractIdFromUrl(downloadUrl || previewUrl) ||
-                    `${category}_${index}`;
-        
-        // Use preview URL as download URL if no direct download found
-        if (!downloadUrl && previewUrl) {
-            downloadUrl = previewUrl.replace('_150.', '_640.'); // Try to get larger version
+        // If still no title, generate one
+        if (!title) {
+            title = `Sound Effect ${index + 1}`;
         }
         
-        if (downloadUrl || previewUrl) {
-            return {
-                id: itemId,
-                title: title.trim() || `${category}_${itemId}`,
-                downloadUrl: downloadUrl,
-                previewUrl: previewUrl,
-                category: category
-            };
+        // Try to find download link or audio source
+        let downloadUrl = '';
+        let itemId = '';
+        
+        // Look for links to individual sound pages
+        const linkSelectors = [
+            'a[href*="/sound-effects/"]',
+            'a[href*="/music/"]',
+            'a[href*="/audio/"]',
+            'a[href*="pixabay.com"]'
+        ];
+        
+        for (const selector of linkSelectors) {
+            const link = audioRow.querySelector(selector);
+            if (link && link.href) {
+                downloadUrl = link.href;
+                
+                // Extract ID from URL
+                const idMatch = downloadUrl.match(/\/(\d+)/);
+                if (idMatch) {
+                    itemId = idMatch[1];
+                }
+                break;
+            }
         }
-    } catch (error) {
-        console.error(`Error extracting item ${index}:`, error);
-    }
-    
-    return null;
-}
-
-function extractItemFromImage(img, index, category) {
-    try {
-        const downloadUrl = img.src.replace('_150.', '_1280.').replace('_640.', '_1280.'); // Get full size
-        const previewUrl = img.src;
-        const title = img.alt || `${category}_${index}`;
-        const itemId = extractIdFromUrl(img.src) || `${category}_${index}`;
+        
+        // Look for audio elements or direct download links
+        if (!downloadUrl) {
+            const audioSelectors = [
+                'audio source',
+                'audio[src]',
+                'a[href*=".mp3"]',
+                'a[href*=".wav"]',
+                'a[href*=".ogg"]',
+                '[data-src*=".mp3"]',
+                '[data-src*=".wav"]'
+            ];
+            
+            for (const selector of audioSelectors) {
+                const audioEl = audioRow.querySelector(selector);
+                if (audioEl) {
+                    downloadUrl = audioEl.src || audioEl.getAttribute('data-src') || audioEl.href || '';
+                    if (downloadUrl) break;
+                }
+            }
+        }
+        
+        // Generate fallback ID if none found
+        if (!itemId) {
+            itemId = `sound_${index}`;
+        }
+        
+        // Look for preview image
+        let previewUrl = '';
+        const imgEl = audioRow.querySelector('img');
+        if (imgEl) {
+            previewUrl = imgEl.src || imgEl.getAttribute('data-src') || '';
+        }
+        
+        console.log(`Extracted sound effect:`, {
+            id: itemId,
+            title: title,
+            downloadUrl: downloadUrl,
+            previewUrl: previewUrl
+        });
         
         return {
             id: itemId,
-            title: title.trim(),
+            title: title,
             downloadUrl: downloadUrl,
             previewUrl: previewUrl,
-            category: category
+            category: 'sound-effects',
+            element: audioRow
         };
+        
     } catch (error) {
-        console.error(`Error extracting image item ${index}:`, error);
+        console.error(`Error extracting sound effect from row ${index}:`, error);
         return null;
     }
 }
 
-function extractIdFromUrl(url) {
-    if (!url) return '';
-    
-    const matches = url.match(/\/(\d+)[-_]/);
-    return matches ? matches[1] : '';
-}
-
 function showScrapingProgress(message) {
-    let progressEl = document.getElementById('pixabay-scraping-progress');
+    let progressEl = document.getElementById('pixabay-sound-scraping-progress');
     
     if (!progressEl) {
         progressEl = document.createElement('div');
-        progressEl.id = 'pixabay-scraping-progress';
+        progressEl.id = 'pixabay-sound-scraping-progress';
         progressEl.style.cssText = `
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(75, 194, 75, 0.95);
+            background: rgba(23, 162, 184, 0.95);
             color: white;
             padding: 20px 30px;
             border-radius: 10px;
@@ -370,21 +373,23 @@ function showScrapingProgress(message) {
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             backdrop-filter: blur(10px);
+            max-width: 400px;
+            text-align: center;
         `;
         document.body.appendChild(progressEl);
     }
     
     progressEl.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-direction: column;">
             <div style="
-                width: 20px;
-                height: 20px;
-                border: 2px solid rgba(255,255,255,0.3);
-                border-top: 2px solid white;
+                width: 24px;
+                height: 24px;
+                border: 3px solid rgba(255,255,255,0.3);
+                border-top: 3px solid white;
                 border-radius: 50%;
                 animation: spin 1s linear infinite;
             "></div>
-            ${message}
+            <div>${message}</div>
         </div>
         <style>
             @keyframes spin {
@@ -396,7 +401,7 @@ function showScrapingProgress(message) {
 }
 
 function hideScrapingProgress() {
-    const progressEl = document.getElementById('pixabay-scraping-progress');
+    const progressEl = document.getElementById('pixabay-sound-scraping-progress');
     if (progressEl) {
         progressEl.remove();
     }
@@ -417,4 +422,4 @@ setInterval(() => {
         isContentScriptActive = false;
         setTimeout(initializeContentScript, 1000);
     }
-}, 1000);
+}, 2000);

@@ -1,0 +1,373 @@
+﻿// Popup script for Pixabay Mass Downloader - Web Scraping Version
+let currentUsername = null;
+let currentUserInfo = null;
+let isDownloading = false;
+let isPaused = false;
+
+// Initialize immediately when DOM is ready
+document.addEventListener('DOMContentLoaded', initializePopup);
+
+async function initializePopup() {
+    try {
+        // Quick status check first
+        await updateStatus();
+        
+        // Check current page - no API key needed for scraping
+        await checkCurrentPage();
+        
+        // Setup event listeners
+        setupEventListeners();
+        
+    } catch (error) {
+        console.error('Error initializing popup:', error);
+        updateStatusMessage('?', 'Error loading extension', 'error');
+    }
+}
+
+function setupEventListeners() {
+    // Category download buttons
+    document.getElementById('photosBtn').addEventListener('click', () => startCategoryDownload('photos'));
+    document.getElementById('illustrationsBtn').addEventListener('click', () => startCategoryDownload('illustrations'));
+    document.getElementById('vectorsBtn').addEventListener('click', () => startCategoryDownload('vectors'));
+    document.getElementById('videosBtn').addEventListener('click', () => startCategoryDownload('videos'));
+    document.getElementById('musicBtn').addEventListener('click', () => startCategoryDownload('music'));
+    document.getElementById('soundEffectsBtn').addEventListener('click', () => startCategoryDownload('sound-effects'));
+    document.getElementById('gifsBtn').addEventListener('click', () => startCategoryDownload('gifs'));
+    
+    // Download control buttons
+    document.getElementById('pauseBtn').addEventListener('click', pauseDownload);
+    document.getElementById('resumeBtn').addEventListener('click', resumeDownload);
+    document.getElementById('cancelBtn').addEventListener('click', cancelDownload);
+    
+    // User profile interactions
+    document.getElementById('followBtn').addEventListener('click', followUser);
+    
+    // Refresh button
+    document.getElementById('refreshBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        checkCurrentPage();
+    });
+}
+
+async function updateStatus() {
+    updateStatusMessage('?', 'Checking status...', '');
+}
+
+async function checkCurrentPage() {
+    try {
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        if (!activeTab || !activeTab.url) {
+            updateStatusMessage('??', 'No active tab detected', 'warning');
+            return;
+        }
+        
+        console.log('Current tab URL:', activeTab.url);
+        
+        if (activeTab.url.includes('pixabay.com/users/')) {
+            currentUsername = extractUsernameFromUrl(activeTab.url);
+            if (currentUsername) {
+                // Get user info from the page itself
+                chrome.runtime.sendMessage({
+                    action: 'GET_USER_INFO',
+                    tabId: activeTab.id
+                });
+                
+                showDownloadSection(currentUsername);
+                updateStatusMessage('?', `Ready to scrape content from: ${currentUsername}`, 'success');
+            } else {
+                updateStatusMessage('??', 'Unable to detect username', 'warning');
+            }
+        } else if (activeTab.url.includes('pixabay.com')) {
+            updateStatusMessage('??', 'Navigate to a user profile page to start scraping', 'warning');
+        } else {
+            updateStatusMessage('??', 'Visit a Pixabay user profile to begin scraping', '');
+        }
+        
+    } catch (error) {
+        console.error('Error checking current page:', error);
+        updateStatusMessage('?', 'Error checking page', 'error');
+    }
+}
+
+function extractUsernameFromUrl(url) {
+    try {
+        const match = url.match(/\/users\/([^\/\?]+)/);
+        const username = match ? decodeURIComponent(match[1]) : null;
+        console.log('Extracted username:', username);
+        return username;
+    } catch (error) {
+        console.error('Error extracting username:', error);
+        return null;
+    }
+}
+
+function updateStatusMessage(icon, message, type = '') {
+    document.getElementById('statusIcon').textContent = icon;
+    document.getElementById('statusMessage').textContent = message;
+    
+    const statusSection = document.querySelector('.status-section');
+    statusSection.className = `status-section ${type}`;
+}
+
+function showDownloadSection(username) {
+    document.getElementById('downloadSection').classList.remove('hidden');
+}
+
+function showUserInfo(userInfo) {
+    currentUserInfo = userInfo;
+    document.getElementById('userInfoSection').classList.remove('hidden');
+    
+    // Update user avatar
+    const avatarEl = document.getElementById('userAvatar');
+    if (userInfo.userImageURL) {
+        avatarEl.innerHTML = `<img src="${userInfo.userImageURL}" alt="${userInfo.username}">`;
+    } else {
+        avatarEl.innerHTML = '??';
+    }
+    
+    // Update user name and profile link
+    document.getElementById('userName').textContent = userInfo.username;
+    const profileLink = document.getElementById('userProfileLink');
+    profileLink.href = userInfo.profileUrl;
+    profileLink.textContent = 'View Profile';
+    
+    console.log('User info displayed:', userInfo);
+}
+
+async function startCategoryDownload(category) {
+    if (!currentUsername || isDownloading) {
+        console.log('Cannot start download:', { currentUsername, isDownloading });
+        return;
+    }
+    
+    isDownloading = true;
+    isPaused = false;
+    
+    const categoryBtn = document.querySelector(`[data-category="${category}"]`);
+    const originalText = categoryBtn.innerHTML;
+    
+    try {
+        console.log(`Starting ${category} download from ${currentUsername}`);
+        
+        // Show progress and controls
+        showProgress();
+        showDownloadControls();
+        categoryBtn.innerHTML = '<div class="spinner"></div> Scanning...';
+        categoryBtn.disabled = true;
+        
+        // Disable all category buttons
+        disableCategoryButtons(true);
+        
+        // Get current tab
+        const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        
+        console.log('Sending scrape download message to background script...');
+        
+        // Send message to background script to start scraping
+        const response = await chrome.runtime.sendMessage({
+            action: 'START_SCRAPE_DOWNLOAD',
+            category: category,
+            username: currentUsername,
+            tabId: activeTab.id
+        });
+        
+        console.log('Background script response:', response);
+        updateStatusMessage('??', `Scanning ${category} content from ${currentUsername}...`, 'success');
+        
+    } catch (error) {
+        console.error('Download error:', error);
+        updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
+        hideProgress();
+        hideDownloadControls();
+        
+        // Reset button
+        categoryBtn.innerHTML = originalText;
+        categoryBtn.disabled = false;
+        disableCategoryButtons(false);
+        isDownloading = false;
+    }
+}
+
+async function pauseDownload() {
+    try {
+        isPaused = true;
+        await chrome.runtime.sendMessage({ action: 'PAUSE_DOWNLOAD' });
+        
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('resumeBtn').disabled = false;
+        
+        updateStatusMessage('??', 'Download paused', 'warning');
+    } catch (error) {
+        console.error('Error pausing download:', error);
+    }
+}
+
+async function resumeDownload() {
+    try {
+        isPaused = false;
+        await chrome.runtime.sendMessage({ action: 'RESUME_DOWNLOAD' });
+        
+        document.getElementById('pauseBtn').disabled = false;
+        document.getElementById('resumeBtn').disabled = true;
+        
+        updateStatusMessage('??', 'Download resumed', 'success');
+    } catch (error) {
+        console.error('Error resuming download:', error);
+    }
+}
+
+async function cancelDownload() {
+    try {
+        await chrome.runtime.sendMessage({ action: 'CANCEL_DOWNLOAD' });
+        
+        updateStatusMessage('?', 'Download canceled', 'error');
+        hideProgress();
+        hideDownloadControls();
+        resetCategoryButtons();
+        disableCategoryButtons(false);
+        isDownloading = false;
+        isPaused = false;
+    } catch (error) {
+        console.error('Error canceling download:', error);
+    }
+}
+
+function followUser() {
+    if (currentUserInfo && currentUserInfo.profileUrl) {
+        chrome.tabs.create({ url: currentUserInfo.profileUrl });
+    }
+}
+
+function showProgress() {
+    document.getElementById('progressSection').classList.remove('hidden');
+    updateProgress(0, 0);
+}
+
+function hideProgress() {
+    document.getElementById('progressSection').classList.add('hidden');
+}
+
+function showDownloadControls() {
+    document.getElementById('downloadControls').classList.remove('hidden');
+    document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('resumeBtn').disabled = true;
+    document.getElementById('cancelBtn').disabled = false;
+}
+
+function hideDownloadControls() {
+    document.getElementById('downloadControls').classList.add('hidden');
+}
+
+function disableCategoryButtons(disabled) {
+    const buttons = document.querySelectorAll('.category-btn');
+    buttons.forEach(btn => {
+        btn.disabled = disabled;
+    });
+}
+
+function updateProgress(current, total) {
+    const progressFill = document.getElementById('progressFill');
+    const progressText = document.getElementById('progressText');
+    
+    if (total > 0) {
+        const percentage = (current / total) * 100;
+        progressFill.style.width = `${percentage}%`;
+        progressText.textContent = `${current} / ${total} downloaded (${percentage.toFixed(1)}%)`;
+    } else {
+        progressFill.style.width = '0%';
+        progressText.textContent = 'Scanning for content...';
+    }
+}
+
+// Listen for messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('Received message in popup:', message);
+    
+    switch (message.action) {
+        case 'USER_INFO_RECEIVED':
+            if (message.userInfo) {
+                showUserInfo(message.userInfo);
+            }
+            break;
+            
+        case 'DOWNLOAD_STARTED':
+            updateStatusMessage('??', `Downloading ${message.category} from ${message.username}...`, 'success');
+            break;
+            
+        case 'UPDATE_PROGRESS':
+            updateProgress(message.current, message.total);
+            updateStatusMessage('??', `Downloaded ${message.current}/${message.total} files`, 'success');
+            break;
+            
+        case 'DOWNLOAD_COMPLETE':
+            updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
+            hideProgress();
+            hideDownloadControls();
+            resetCategoryButtons();
+            disableCategoryButtons(false);
+            isDownloading = false;
+            isPaused = false;
+            break;
+            
+        case 'DOWNLOAD_CANCELED':
+            updateStatusMessage('?', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
+            hideProgress();
+            hideDownloadControls();
+            resetCategoryButtons();
+            disableCategoryButtons(false);
+            isDownloading = false;
+            isPaused = false;
+            break;
+            
+        case 'DOWNLOAD_PAUSED':
+            updateStatusMessage('??', 'Download paused', 'warning');
+            break;
+            
+        case 'DOWNLOAD_RESUMED':
+            updateStatusMessage('??', 'Download resumed', 'success');
+            break;
+            
+        case 'DOWNLOAD_ERROR':
+            console.error('Download error from background:', message.error);
+            updateStatusMessage('?', `Error: ${message.error}`, 'error');
+            hideProgress();
+            hideDownloadControls();
+            resetCategoryButtons();
+            disableCategoryButtons(false);
+            isDownloading = false;
+            isPaused = false;
+            break;
+    }
+});
+
+function resetCategoryButtons() {
+    // Reset all category buttons
+    const categoryLabels = {
+        'photos': '?? Photos',
+        'illustrations': '?? Illustrations',
+        'vectors': '?? Vectors',
+        'videos': '?? Videos',
+        'music': '?? Music',
+        'sound-effects': '?? Sound FX',
+        'gifs': '??? GIFs'
+    };
+    
+    Object.entries(categoryLabels).forEach(([category, label]) => {
+        const btn = document.querySelector(`[data-category="${category}"]`);
+        if (btn) {
+            btn.innerHTML = label;
+            btn.disabled = false;
+        }
+    });
+}
+
+// Refresh status when popup is opened
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        setTimeout(checkCurrentPage, 100);
+    }
+});
+
+// Add debugging
+console.log('Popup script (Web Scraper) loaded successfully');

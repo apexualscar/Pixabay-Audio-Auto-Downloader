@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:popup.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{F62E3F56-D98E-4FE0-A04F-B0373B663573}|Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader.csproj|c:\\users\\new user\\source\\repos\\pixabay-mass-audio-downloader\\pixabay-mass-audio-downloader\\wwwroot\\js\\app.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}|",
       "RelativeMoniker": "D:0:0:{F62E3F56-D98E-4FE0-A04F-B0373B663573}|Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader.csproj|solutionrelative:pixabay-mass-audio-downloader\\wwwroot\\js\\app.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}|"
     },
@@ -37,10 +41,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\background.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}|",
       "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:background.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}|"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.html||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:popup.html||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.js||{14D17961-FE51-464D-9111-C4AF11D7D99A}|",
@@ -82,7 +82,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 312,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 14,
           "Children": [
             {
               "$type": "Bookmark",
@@ -90,7 +90,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "IMPROVEMENTS.md",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\IMPROVEMENTS.md",
               "RelativeDocumentMoniker": "IMPROVEMENTS.md",
@@ -98,12 +98,11 @@
               "RelativeToolTip": "IMPROVEMENTS.md",
               "ViewState": "AgIAAB4AAAAAAAAAAAAAAIYAAABKAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001818|",
-              "WhenOpened": "2025-10-14T03:14:43.521Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T03:14:43.521Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "install-extension.ps1",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\install-extension.ps1",
               "RelativeDocumentMoniker": "install-extension.ps1",
@@ -111,8 +110,7 @@
               "RelativeToolTip": "install-extension.ps1",
               "ViewState": "AgIAAEkAAAAAAAAAAAAAAEkAAABSAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
-              "WhenOpened": "2025-10-14T01:01:30.385Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T01:01:30.385Z"
             },
             {
               "$type": "Document",
@@ -140,7 +138,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "app.js",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader\\wwwroot\\js\\app.js",
               "RelativeDocumentMoniker": "Pixabay-Mass-Audio-Downloader\\wwwroot\\js\\app.js",
@@ -165,20 +163,19 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 5,
+              "DocumentIndex": 6,
               "Title": "Home.razor",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader\\Components\\Pages\\Home.razor",
               "RelativeDocumentMoniker": "Pixabay-Mass-Audio-Downloader\\Components\\Pages\\Home.razor",
               "ToolTip": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader\\Components\\Pages\\Home.razor",
               "RelativeToolTip": "Pixabay-Mass-Audio-Downloader\\Components\\Pages\\Home.razor",
-              "ViewState": "AgIAAIcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAFsAAAAAAAAAAAAvwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-10-14T00:58:18.606Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T00:58:18.606Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "NavMenu.razor",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\Pixabay-Mass-Audio-Downloader\\Components\\Layout\\NavMenu.razor",
               "RelativeDocumentMoniker": "Pixabay-Mass-Audio-Downloader\\Components\\Layout\\NavMenu.razor",
@@ -186,8 +183,7 @@
               "RelativeToolTip": "Pixabay-Mass-Audio-Downloader\\Components\\Layout\\NavMenu.razor",
               "ViewState": "AgIAACQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2025-10-14T00:57:47.34Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T00:57:47.34Z"
             },
             {
               "$type": "Document",
@@ -245,40 +241,40 @@
               "RelativeDocumentMoniker": "popup.js",
               "ToolTip": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.js",
               "RelativeToolTip": "popup.js",
-              "ViewState": "AgIAAHIBAAAAAAAAAABIwHQBAAA+AAAAAAAAAA==",
+              "ViewState": "AgIAAO0BAAAAAAAAAABIwO8BAABHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
               "WhenOpened": "2025-10-14T00:55:47.887Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 9,
+              "DocumentIndex": 0,
               "Title": "popup.html",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.html",
               "RelativeDocumentMoniker": "popup.html",
               "ToolTip": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\popup.html",
               "RelativeToolTip": "popup.html",
-              "ViewState": "AgIAAMkBAAAAAAAAAABgwNABAAAHAAAAAAAAAA==",
+              "ViewState": "AgIAALABAAAAAAAAAAAAAC4CAAAHAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001512|",
               "WhenOpened": "2025-10-14T00:55:21.547Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 8,
+              "DocumentIndex": 9,
               "Title": "background.js",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\background.js",
               "RelativeDocumentMoniker": "background.js",
               "ToolTip": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\background.js",
               "RelativeToolTip": "background.js",
-              "ViewState": "AgIAAAcCAAAAAAAAAABIwAkCAAADAAAAAAAAAA==",
+              "ViewState": "AgIAAMABAAAAAAAAAABIwMIBAAADAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
               "WhenOpened": "2025-10-14T00:54:57.946Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "content-styles.css",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\content-styles.css",
               "RelativeDocumentMoniker": "content-styles.css",
@@ -286,25 +282,24 @@
               "RelativeToolTip": "content-styles.css",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACoAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003000|",
-              "WhenOpened": "2025-10-14T00:54:36.671Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T00:54:36.671Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 7,
+              "DocumentIndex": 8,
               "Title": "content-script.js",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\content-script.js",
               "RelativeDocumentMoniker": "content-script.js",
               "ToolTip": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\content-script.js",
               "RelativeToolTip": "content-script.js",
-              "ViewState": "AgIAAKEBAAAAAAAAAABIwKMBAAAJAAAAAAAAAA==",
+              "ViewState": "AgIAAF8CAAAAAAAAAABIwGECAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001646|",
               "WhenOpened": "2025-10-14T00:54:17.363Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 6,
+              "DocumentIndex": 7,
               "Title": "manifest.json",
               "DocumentMoniker": "C:\\Users\\New User\\source\\repos\\Pixabay-Mass-Audio-Downloader\\manifest.json",
               "RelativeDocumentMoniker": "manifest.json",
@@ -312,8 +307,7 @@
               "RelativeToolTip": "manifest.json",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACQAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2025-10-14T00:53:46.252Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-10-14T00:53:46.252Z"
             }
           ]
         }

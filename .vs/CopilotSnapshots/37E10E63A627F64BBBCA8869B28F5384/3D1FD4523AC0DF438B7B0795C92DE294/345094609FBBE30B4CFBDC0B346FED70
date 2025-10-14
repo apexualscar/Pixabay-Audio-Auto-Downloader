@@ -1,0 +1,37 @@
+﻿{
+  "manifest_version": 3,
+  "name": "Pixabay Mass Downloader",
+  "version": "2.0",
+  "description": "Web scraper to download all content types from Pixabay user profiles - no API key required!",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "downloads",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://pixabay.com/*",
+    "https://cdn.pixabay.com/*",
+    "https://*.pixabay.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://pixabay.com/users/*"],
+      "js": ["content-script.js"],
+      "css": ["content-styles.css"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Pixabay Mass Downloader - Web Scraper"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["content-styles.css", "popup.html"],
+      "matches": ["https://pixabay.com/*"]
+    }
+  ]
+}

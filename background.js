@@ -1,5 +1,5 @@
-// Background service worker for Pixabay Mass Downloader - Web Scraping Version
-console.log('Pixabay Mass Downloader (Web Scraper) background script loaded');
+// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
 let isDownloadPaused = false;
@@ -10,8 +10,8 @@ let downloadQueue = [];
 // Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.action) {
-        case 'START_SCRAPE_DOWNLOAD':
-            handleScrapeDownloadRequest(message, sender.tab?.id || null);
+        case 'START_SOUND_EFFECTS_SCAN':
+            handleSoundEffectsScan(message, sender.tab?.id || null);
             sendResponse({ success: true });
             break;
         case 'PAUSE_DOWNLOAD':
@@ -30,8 +30,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             getUserInfoFromPage(message.tabId);
             sendResponse({ success: true });
             break;
-        case 'SCRAPE_CATEGORY':
-            scrapeCategoryContent(message, sender.tab?.id || null);
+        case 'SOUND_EFFECTS_EXTRACTED':
+            handleSoundEffectsExtracted(message, sender.tab?.id || null);
+            sendResponse({ success: true });
+            break;
+        case 'SCANNING_ERROR':
+            handleScanningError(message);
             sendResponse({ success: true });
             break;
     }
@@ -50,10 +54,14 @@ async function getUserInfoFromPage(tabId) {
             const userInfo = results[0].result;
             
             // Send user info to popup
-            chrome.runtime.sendMessage({
-                action: 'USER_INFO_RECEIVED',
-                userInfo: userInfo
-            }).catch(() => {});
+            try {
+                await chrome.runtime.sendMessage({
+                    action: 'USER_INFO_RECEIVED',
+                    userInfo: userInfo
+                });
+            } catch (error) {
+                console.log('Could not send user info to popup (popup may be closed)');
+            }
         }
     } catch (error) {
         console.error('Error getting user info from page:', error);
@@ -79,7 +87,8 @@ function extractUserInfoFromPage() {
             '.profile-avatar img',
             '.user-profile img',
             '[data-testid="user-avatar"] img',
-            '.avatar img'
+            '.avatar img',
+            'img[alt*="' + username + '"]'
         ];
         
         for (const selector of avatarSelectors) {
@@ -102,221 +111,90 @@ function extractUserInfoFromPage() {
     }
 }
 
-async function scrapeCategoryContent(request, tabId) {
-    const { category, username } = request;
+async function handleSoundEffectsScan(request, tabId) {
+    const { tabId: requestTabId } = request;
+    const targetTabId = requestTabId || tabId;
     
     try {
-        console.log(`Starting to scrape ${category} content for user: ${username}`);
+        console.log('Starting sound effects scan...');
         
-        // Inject content script to scrape the specific category
-        const results = await chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            function: scrapeContentByCategory,
-            args: [category, username]
-        });
-        
-        if (results && results[0] && results[0].result) {
-            const contentItems = results[0].result;
-            console.log(`Found ${contentItems.length} ${category} items for ${username}`);
-            
-            if (contentItems.length > 0) {
-                await startDownloadQueue(contentItems, category, username, tabId);
-            } else {
-                notifyError(tabId, `No ${category} content found for ${username}`);
-            }
+        // Send message to content script to start scanning
+        try {
+            await chrome.tabs.sendMessage(targetTabId, {
+                action: 'SCAN_SOUND_EFFECTS'
+            });
+        } catch (error) {
+            console.error('Error communicating with content script:', error);
+            sendMessageToPopup({
+                action: 'SCANNING_ERROR',
+                error: 'Could not communicate with page. Try refreshing and try again.'
+            });
         }
+        
     } catch (error) {
-        console.error(`Error scraping ${category} content:`, error);
-        notifyError(tabId, `Failed to scrape ${category} content: ${error.message}`);
+        console.error('Sound effects scan error:', error);
+        sendMessageToPopup({
+            action: 'SCANNING_ERROR',
+            error: error.message
+        });
     }
 }
 
-// Function to be injected to scrape content by category
-function scrapeContentByCategory(category, username) {
-    console.log(`Scraping ${category} content...`);
+function handleSoundEffectsExtracted(message, tabId) {
+    const { items } = message;
     
-    // Map category to Pixabay URLs and selectors
-    const categoryConfig = {
-        photos: {
-            path: '/photos/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: 'img[alt], .title, h3',
-                image: 'img'
-            }
-        },
-        illustrations: {
-            path: '/illustrations/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: 'img[alt], .title, h3',
-                image: 'img'
-            }
-        },
-        vectors: {
-            path: '/vectors/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: 'img[alt], .title, h3',
-                image: 'img'
-            }
-        },
-        videos: {
-            path: '/videos/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: 'img[alt], .title, h3, .video-title',
-                image: 'img, video'
-            }
-        },
-        music: {
-            path: '/music/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item, .audio-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: '.title, h3, .audio-title, .track-title',
-                image: 'img'
-            }
-        },
-        'sound-effects': {
-            path: '/sound-effects/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item, .audio-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: '.title, h3, .audio-title, .track-title',
-                image: 'img'
-            }
-        },
-        gifs: {
-            path: '/gifs/',
-            selectors: {
-                items: 'div[data-testid="media-item"], .item, .media-item',
-                downloadBtn: 'a[href*="/download/"], button[aria-label*="download"], .download-btn',
-                title: 'img[alt], .title, h3',
-                image: 'img'
-            }
-        }
-    };
+    console.log(`Sound effects extracted: ${items.length} items`);
     
-    const config = categoryConfig[category];
-    if (!config) {
-        console.error(`Unknown category: ${category}`);
-        return [];
-    }
-    
-    // Navigate to category page if not already there
-    const expectedPath = `/users/${username}${config.path}`;
-    if (!window.location.pathname.includes(expectedPath)) {
-        console.log(`Navigating to ${expectedPath}`);
-        // We'll need to handle navigation differently - return instruction to navigate
-        return { needsNavigation: true, url: `https://pixabay.com/users/${username}${config.path}` };
-    }
-    
-    // Scrape content items from current page
-    const contentItems = [];
-    const itemElements = document.querySelectorAll(config.selectors.items);
-    
-    console.log(`Found ${itemElements.length} potential items`);
-    
-    itemElements.forEach((item, index) => {
-        try {
-            // Extract download link
-            const downloadBtn = item.querySelector(config.selectors.downloadBtn);
-            let downloadUrl = '';
-            
-            if (downloadBtn) {
-                if (downloadBtn.tagName === 'A') {
-                    downloadUrl = downloadBtn.href;
-                } else {
-                    // For buttons, we might need to click them or extract data attributes
-                    downloadUrl = downloadBtn.getAttribute('data-download-url') || 
-                                 downloadBtn.getAttribute('data-href') || '';
-                }
-            }
-            
-            // Extract title/name
-            const titleEl = item.querySelector(config.selectors.title);
-            const title = titleEl ? (titleEl.alt || titleEl.textContent || titleEl.innerText || '').trim() : `${category}_${index}`;
-            
-            // Extract preview image
-            const imageEl = item.querySelector(config.selectors.image);
-            const previewUrl = imageEl ? imageEl.src : '';
-            
-            // Extract item ID from various possible sources
-            let itemId = '';
-            const idMatch = item.id.match(/\d+/) || 
-                           (downloadUrl.match(/\/(\d+)\//) || [])[1] ||
-                           (previewUrl.match(/\/(\d+)_/) || [])[1] ||
-                           `item_${index}`;
-            
-            if (typeof idMatch === 'string') {
-                itemId = idMatch;
-            } else if (Array.isArray(idMatch)) {
-                itemId = idMatch[0] || `item_${index}`;
-            } else {
-                itemId = `item_${index}`;
-            }
-            
-            if (downloadUrl || previewUrl) {
-                contentItems.push({
-                    id: itemId,
-                    title: title,
-                    downloadUrl: downloadUrl,
-                    previewUrl: previewUrl,
-                    category: category,
-                    element: item,
-                    index: index
-                });
-            }
-        } catch (error) {
-            console.error(`Error processing item ${index}:`, error);
-        }
+    // Forward to popup
+    sendMessageToPopup({
+        action: 'SOUND_EFFECTS_SCANNED',
+        items: items
     });
     
-    console.log(`Successfully extracted ${contentItems.length} items`);
-    return contentItems;
+    // If items found, start download process
+    if (items.length > 0) {
+        startSoundEffectsDownload(items, tabId);
+    } else {
+        sendMessageToPopup({
+            action: 'SCANNING_ERROR',
+            error: 'No sound effects found on this page'
+        });
+    }
 }
 
-async function handleScrapeDownloadRequest(request, tabId) {
-    const { category, username } = request;
+function handleScanningError(message) {
+    console.error('Scanning error:', message.error);
     
+    // Forward to popup
+    sendMessageToPopup({
+        action: 'SCANNING_ERROR',
+        error: message.error
+    });
+}
+
+async function startSoundEffectsDownload(soundEffects, tabId) {
     // Reset download control flags
     isDownloadPaused = false;
     isDownloadCanceled = false;
     currentDownloadSession = Date.now();
-    downloadQueue = [];
+    downloadQueue = soundEffects;
     
     try {
-        console.log(`Starting scrape download for ${category} from user: ${username}`);
-        
-        // Notify that download is starting
-        notifyDownloadStarted(tabId, username, category);
-        
-        // Start scraping the specific category
-        await scrapeCategoryContent({ category, username }, tabId);
-        
-    } catch (error) {
-        console.error('Scrape download error:', error);
-        notifyError(tabId, error.message);
-    }
-}
-
-async function startDownloadQueue(contentItems, category, username, tabId) {
-    try {
-        downloadQueue = contentItems;
-        const totalCount = contentItems.length;
+        const totalCount = soundEffects.length;
         let downloadedCount = 0;
         
-        // Create folder name
-        const folderName = `${sanitizeFilename(username)}_${category}`;
+        console.log(`Starting download of ${totalCount} sound effects`);
         
-        console.log(`Starting download of ${totalCount} ${category} items to folder: ${folderName}`);
+        // Notify that download is starting
+        sendMessageToPopup({
+            action: 'DOWNLOAD_STARTED',
+            count: totalCount
+        });
         
-        for (let i = 0; i < contentItems.length; i++) {
+        // Create folder name for sound effects
+        const folderName = 'pixabay_sound_effects';
+        
+        for (let i = 0; i < soundEffects.length; i++) {
             // Check for cancel/pause
             if (isDownloadCanceled) {
                 console.log('Download canceled by user');
@@ -330,59 +208,73 @@ async function startDownloadQueue(contentItems, category, username, tabId) {
             
             if (isDownloadCanceled) break;
             
-            const item = contentItems[i];
+            const soundEffect = soundEffects[i];
             
             try {
-                await downloadContentItem(item, folderName, username, tabId);
+                await downloadSoundEffect(soundEffect, folderName);
                 downloadedCount++;
                 
                 // Update progress
-                notifyProgress(tabId, downloadedCount, totalCount);
+                sendMessageToPopup({
+                    action: 'UPDATE_PROGRESS',
+                    current: downloadedCount,
+                    total: totalCount
+                });
                 
                 // Add delay between downloads
                 await sleep(500);
                 
             } catch (error) {
-                console.error(`Failed to download ${item.id}:`, error);
+                console.error(`Failed to download ${soundEffect.id}:`, error);
                 // Continue with next file
             }
         }
         
         // Notify completion or cancellation
         if (isDownloadCanceled) {
-            notifyDownloadCanceled(tabId, downloadedCount);
+            sendMessageToPopup({
+                action: 'DOWNLOAD_CANCELED',
+                count: downloadedCount
+            });
         } else {
-            notifyComplete(tabId, downloadedCount);
+            sendMessageToPopup({
+                action: 'DOWNLOAD_COMPLETE',
+                count: downloadedCount
+            });
         }
         
     } catch (error) {
-        console.error('Download queue error:', error);
-        notifyError(tabId, error.message);
+        console.error('Download error:', error);
+        sendMessageToPopup({
+            action: 'DOWNLOAD_ERROR',
+            error: error.message
+        });
     }
 }
 
-async function downloadContentItem(item, folderName, username, tabId) {
+async function downloadSoundEffect(soundEffect, folderName) {
     try {
-        let downloadUrl = item.downloadUrl;
+        let downloadUrl = soundEffect.downloadUrl;
         
-        // If no direct download URL, try to get the actual download link
-        if (!downloadUrl && item.previewUrl) {
-            // Use preview URL as fallback
-            downloadUrl = item.previewUrl;
+        // If we have a Pixabay item page URL, we might need to navigate to it to get the actual download link
+        if (!downloadUrl || !downloadUrl.includes('.mp3') && !downloadUrl.includes('.wav') && !downloadUrl.includes('.ogg')) {
+            // If we only have the item page URL, use the preview URL or construct a direct link
+            if (soundEffect.previewUrl) {
+                downloadUrl = soundEffect.previewUrl;
+            } else if (soundEffect.downloadUrl && soundEffect.downloadUrl.includes('pixabay.com')) {
+                // Try to construct a direct download URL (this might need adjustment based on Pixabay's URL structure)
+                downloadUrl = soundEffect.downloadUrl;
+            } else {
+                throw new Error(`No suitable download URL found for ${soundEffect.id}`);
+            }
         }
-        
-        if (!downloadUrl) {
-            throw new Error(`No download URL found for item ${item.id}`);
-        }
-        
-        // Determine file extension
-        const extension = getFileExtension(downloadUrl, item.category);
         
         // Create filename
-        const safeTitle = sanitizeFilename(item.title || `${item.category}_${item.id}`);
-        const filename = `${folderName}/${username}_${item.id}_${safeTitle}.${extension}`;
+        const safeTitle = sanitizeFilename(soundEffect.title || `sound_effect_${soundEffect.id}`);
+        const extension = getFileExtensionFromUrl(downloadUrl) || 'mp3';
+        const filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
         
-        console.log(`Downloading: ${filename} from ${downloadUrl}`);
+        console.log(`Downloading sound effect: ${filename} from ${downloadUrl}`);
         
         // Use Chrome's downloads API
         return new Promise((resolve, reject) => {
@@ -402,48 +294,39 @@ async function downloadContentItem(item, folderName, username, tabId) {
             });
         });
     } catch (error) {
-        console.error(`Error downloading item ${item.id}:`, error);
+        console.error(`Error downloading sound effect ${soundEffect.id}:`, error);
         throw error;
     }
 }
 
-function getFileExtension(url, category) {
+function getFileExtensionFromUrl(url) {
+    if (!url) return 'mp3';
+    
     try {
         const urlObj = new URL(url);
         const pathname = urlObj.pathname;
         const extension = pathname.split('.').pop()?.toLowerCase();
         
-        if (extension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4', 'webm', 'mp3', 'wav', 'ogg'].includes(extension)) {
+        if (extension && ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(extension)) {
             return extension;
         }
         
-        // Default extensions by category
-        const defaultExtensions = {
-            photos: 'jpg',
-            illustrations: 'jpg',
-            vectors: 'svg',
-            videos: 'mp4',
-            music: 'mp3',
-            'sound-effects': 'mp3',
-            gifs: 'gif'
-        };
-        
-        return defaultExtensions[category] || 'jpg';
+        return 'mp3'; // Default for audio files
     } catch {
-        return 'jpg';
+        return 'mp3';
     }
 }
 
 function pauseDownload() {
     isDownloadPaused = true;
     console.log('Download paused');
-    notifyDownloadPaused();
+    sendMessageToPopup({ action: 'DOWNLOAD_PAUSED' });
 }
 
 function resumeDownload() {
     isDownloadPaused = false;
     console.log('Download resumed');
-    notifyDownloadResumed();
+    sendMessageToPopup({ action: 'DOWNLOAD_RESUMED' });
 }
 
 function cancelDownload() {
@@ -451,7 +334,7 @@ function cancelDownload() {
     isDownloadPaused = false;
     downloadQueue = [];
     console.log('Download canceled');
-    notifyDownloadCanceled();
+    sendMessageToPopup({ action: 'DOWNLOAD_CANCELED' });
 }
 
 function sanitizeFilename(filename) {
@@ -468,55 +351,25 @@ function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Notification functions
-function notifyDownloadStarted(tabId, username, category) {
-    const message = { action: 'DOWNLOAD_STARTED', username, category };
-    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyProgress(tabId, current, total) {
-    const message = { action: 'UPDATE_PROGRESS', current, total };
-    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyComplete(tabId, count) {
-    const message = { action: 'DOWNLOAD_COMPLETE', count };
-    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyDownloadPaused() {
-    const message = { action: 'DOWNLOAD_PAUSED' };
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyDownloadResumed() {
-    const message = { action: 'DOWNLOAD_RESUMED' };
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyDownloadCanceled(tabId, count) {
-    const message = { action: 'DOWNLOAD_CANCELED', count: count || 0 };
-    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    chrome.runtime.sendMessage(message).catch(() => {});
-}
-
-function notifyError(tabId, error) {
-    const message = { action: 'DOWNLOAD_ERROR', error };
-    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
-    chrome.runtime.sendMessage(message).catch(() => {});
+// Helper function to send messages to popup safely
+async function sendMessageToPopup(message) {
+    try {
+        await chrome.runtime.sendMessage(message);
+    } catch (error) {
+        // Popup might be closed, which is normal - just log it
+        console.log('Could not send message to popup (popup may be closed):', message.action);
+    }
 }
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener((details) => {
     if (details.reason === 'install') {
-        console.log('Pixabay Mass Downloader (Web Scraper) installed');
+        console.log('Pixabay Sound Effects Downloader installed');
         chrome.storage.local.set({
             'firstInstall': true,
             'installDate': new Date().toISOString(),
-            'scrapingMode': true
+            'scrapingMode': 'sound-effects',
+            'version': '3.0'
         });
     }
 });

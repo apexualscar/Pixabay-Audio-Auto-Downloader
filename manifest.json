@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Pixabay Mass Downloader",
-  "version": "2.0",
-  "description": "Web scraper to download all content types from Pixabay user profiles - no API key required!",
+  "name": "Pixabay Sound Effects Downloader",
+  "version": "3.0",
+  "description": "Extract and download sound effects from Pixabay pages using advanced DOM selectors - no API key required!",
   "permissions": [
     "activeTab",
     "storage",
@@ -16,7 +16,7 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://pixabay.com/users/*"],
+      "matches": ["https://pixabay.com/*"],
       "js": ["content-script.js"],
       "css": ["content-styles.css"]
     }
@@ -26,7 +26,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Pixabay Mass Downloader - Web Scraper"
+    "default_title": "Pixabay Sound Effects Downloader"
   },
   "web_accessible_resources": [
     {

@@ -1,0 +1,421 @@
+﻿// Background service worker for Pixabay Mass Downloader - Enhanced Web Scraping Version
+console.log('Pixabay Mass Downloader (Enhanced Web Scraper) background script loaded');
+
+// Download control variables
+let isDownloadPaused = false;
+let isDownloadCanceled = false;
+let currentDownloadSession = null;
+let downloadQueue = [];
+
+// Listen for messages from popup and content scripts
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch (message.action) {
+        case 'START_SCRAPE_DOWNLOAD':
+            handleScrapeDownloadRequest(message, sender.tab?.id || null);
+            sendResponse({ success: true });
+            break;
+        case 'PAUSE_DOWNLOAD':
+            pauseDownload();
+            sendResponse({ success: true });
+            break;
+        case 'RESUME_DOWNLOAD':
+            resumeDownload();
+            sendResponse({ success: true });
+            break;
+        case 'CANCEL_DOWNLOAD':
+            cancelDownload();
+            sendResponse({ success: true });
+            break;
+        case 'GET_USER_INFO':
+            getUserInfoFromPage(message.tabId);
+            sendResponse({ success: true });
+            break;
+        case 'CHECK_CATEGORIES':
+            checkCategoriesOnPage(message.tabId);
+            sendResponse({ success: true });
+            break;
+        case 'CONTENT_SCRAPED':
+            handleContentScraped(message, sender.tab?.id || null);
+            sendResponse({ success: true });
+            break;
+        case 'CATEGORIES_CHECKED':
+            handleCategoriesChecked(message);
+            sendResponse({ success: true });
+            break;
+        case 'SCRAPING_ERROR':
+            handleScrapingError(message);
+            sendResponse({ success: true });
+            break;
+    }
+    return true;
+});
+
+async function getUserInfoFromPage(tabId) {
+    try {
+        // Inject script to extract user info from the current page
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: extractUserInfoFromPage
+        });
+        
+        if (results && results[0] && results[0].result) {
+            const userInfo = results[0].result;
+            
+            // Send user info to popup
+            chrome.runtime.sendMessage({
+                action: 'USER_INFO_RECEIVED',
+                userInfo: userInfo
+            }).catch(() => {});
+        }
+    } catch (error) {
+        console.error('Error getting user info from page:', error);
+    }
+}
+
+async function checkCategoriesOnPage(tabId) {
+    try {
+        console.log('Requesting category check from content script...');
+        
+        // Send message to content script to check categories
+        chrome.tabs.sendMessage(tabId, {
+            action: 'CHECK_CATEGORIES'
+        }).catch(() => {
+            console.log('Could not reach content script, category info will be limited');
+        });
+        
+    } catch (error) {
+        console.error('Error checking categories:', error);
+    }
+}
+
+// Function to be injected into the page to extract user info
+function extractUserInfoFromPage() {
+    try {
+        // Extract username from URL
+        const urlMatch = window.location.pathname.match(/\/users\/([^\/\?]+)/);
+        const username = urlMatch ? decodeURIComponent(urlMatch[1]) : null;
+        
+        if (!username) return null;
+        
+        // Try to find user avatar and info on the page
+        let userImageURL = '';
+        let userId = '';
+        
+        // Look for user avatar in various possible locations
+        const avatarSelectors = [
+            '.user-avatar img',
+            '.profile-avatar img',
+            '.user-profile img',
+            '[data-testid="user-avatar"] img',
+            '.avatar img',
+            'img[alt*="' + username + '"]'
+        ];
+        
+        for (const selector of avatarSelectors) {
+            const avatarEl = document.querySelector(selector);
+            if (avatarEl && avatarEl.src) {
+                userImageURL = avatarEl.src;
+                break;
+            }
+        }
+        
+        return {
+            username: username,
+            userImageURL: userImageURL,
+            userId: userId,
+            profileUrl: window.location.href
+        };
+    } catch (error) {
+        console.error('Error extracting user info:', error);
+        return null;
+    }
+}
+
+function handleCategoriesChecked(message) {
+    console.log('Categories checked:', message.categories);
+    
+    // Forward to popup
+    chrome.runtime.sendMessage({
+        action: 'CATEGORIES_CHECKED',
+        categories: message.categories
+    }).catch(() => {});
+}
+
+function handleContentScraped(message, tabId) {
+    const { category, username, items } = message;
+    
+    console.log(`Content scraped: ${items.length} ${category} items for ${username}`);
+    
+    // Forward to popup
+    chrome.runtime.sendMessage({
+        action: 'CONTENT_SCRAPED',
+        category: category,
+        username: username,
+        items: items
+    }).catch(() => {});
+    
+    // If items found, start download process
+    if (items.length > 0) {
+        startDownloadQueue(items, category, username, tabId);
+    } else {
+        notifyError(tabId, `No ${category} content found for ${username}`);
+    }
+}
+
+function handleScrapingError(message) {
+    console.error('Scraping error:', message.error);
+    
+    // Forward to popup
+    chrome.runtime.sendMessage({
+        action: 'SCRAPING_ERROR',
+        error: message.error
+    }).catch(() => {});
+}
+
+async function handleScrapeDownloadRequest(request, tabId) {
+    const { category, username } = request;
+    
+    // Reset download control flags
+    isDownloadPaused = false;
+    isDownloadCanceled = false;
+    currentDownloadSession = Date.now();
+    downloadQueue = [];
+    
+    try {
+        console.log(`Starting scrape download for ${category} from user: ${username}`);
+        
+        // Notify that download is starting
+        notifyDownloadStarted(tabId, username, category);
+        
+        // Send message to content script to start scraping
+        chrome.tabs.sendMessage(tabId, {
+            action: 'SCRAPE_CATEGORY',
+            category: category,
+            username: username
+        }).catch((error) => {
+            console.error('Error communicating with content script:', error);
+            notifyError(tabId, 'Could not communicate with page. Try refreshing and try again.');
+        });
+        
+    } catch (error) {
+        console.error('Scrape download error:', error);
+        notifyError(tabId, error.message);
+    }
+}
+
+async function startDownloadQueue(contentItems, category, username, tabId) {
+    try {
+        downloadQueue = contentItems;
+        const totalCount = contentItems.length;
+        let downloadedCount = 0;
+        
+        // Create folder name
+        const folderName = `${sanitizeFilename(username)}_${category}`;
+        
+        console.log(`Starting download of ${totalCount} ${category} items to folder: ${folderName}`);
+        
+        for (let i = 0; i < contentItems.length; i++) {
+            // Check for cancel/pause
+            if (isDownloadCanceled) {
+                console.log('Download canceled by user');
+                break;
+            }
+            
+            while (isDownloadPaused) {
+                await sleep(500);
+                if (isDownloadCanceled) break;
+            }
+            
+            if (isDownloadCanceled) break;
+            
+            const item = contentItems[i];
+            
+            try {
+                await downloadContentItem(item, folderName, username, tabId);
+                downloadedCount++;
+                
+                // Update progress
+                notifyProgress(tabId, downloadedCount, totalCount);
+                
+                // Add delay between downloads
+                await sleep(300);
+                
+            } catch (error) {
+                console.error(`Failed to download ${item.id}:`, error);
+                // Continue with next file
+            }
+        }
+        
+        // Notify completion or cancellation
+        if (isDownloadCanceled) {
+            notifyDownloadCanceled(tabId, downloadedCount);
+        } else {
+            notifyComplete(tabId, downloadedCount);
+        }
+        
+    } catch (error) {
+        console.error('Download queue error:', error);
+        notifyError(tabId, error.message);
+    }
+}
+
+async function downloadContentItem(item, folderName, username, tabId) {
+    try {
+        let downloadUrl = item.downloadUrl;
+        
+        // If no direct download URL, try to get the actual download link
+        if (!downloadUrl && item.previewUrl) {
+            // Use preview URL as fallback
+            downloadUrl = item.previewUrl;
+        }
+        
+        if (!downloadUrl) {
+            throw new Error(`No download URL found for item ${item.id}`);
+        }
+        
+        // Determine file extension
+        const extension = getFileExtension(downloadUrl, item.category);
+        
+        // Create filename
+        const safeTitle = sanitizeFilename(item.title || `${item.category}_${item.id}`);
+        const filename = `${folderName}/${username}_${item.id}_${safeTitle}.${extension}`;
+        
+        console.log(`Downloading: ${filename} from ${downloadUrl}`);
+        
+        // Use Chrome's downloads API
+        return new Promise((resolve, reject) => {
+            chrome.downloads.download({
+                url: downloadUrl,
+                filename: filename,
+                saveAs: false,
+                conflictAction: 'uniquify'
+            }, (downloadId) => {
+                if (chrome.runtime.lastError) {
+                    console.error(`Download failed for ${filename}:`, chrome.runtime.lastError);
+                    reject(new Error(chrome.runtime.lastError.message));
+                } else {
+                    console.log(`Started download: ${downloadId} - ${filename}`);
+                    resolve(downloadId);
+                }
+            });
+        });
+    } catch (error) {
+        console.error(`Error downloading item ${item.id}:`, error);
+        throw error;
+    }
+}
+
+function getFileExtension(url, category) {
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const extension = pathname.split('.').pop()?.toLowerCase();
+        
+        if (extension && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'mp4', 'webm', 'mp3', 'wav', 'ogg'].includes(extension)) {
+            return extension;
+        }
+        
+        // Default extensions by category
+        const defaultExtensions = {
+            photos: 'jpg',
+            illustrations: 'jpg',
+            vectors: 'svg',
+            videos: 'mp4',
+            music: 'mp3',
+            'sound-effects': 'mp3',
+            gifs: 'gif'
+        };
+        
+        return defaultExtensions[category] || 'jpg';
+    } catch {
+        return 'jpg';
+    }
+}
+
+function pauseDownload() {
+    isDownloadPaused = true;
+    console.log('Download paused');
+    notifyDownloadPaused();
+}
+
+function resumeDownload() {
+    isDownloadPaused = false;
+    console.log('Download resumed');
+    notifyDownloadResumed();
+}
+
+function cancelDownload() {
+    isDownloadCanceled = true;
+    isDownloadPaused = false;
+    downloadQueue = [];
+    console.log('Download canceled');
+    notifyDownloadCanceled();
+}
+
+function sanitizeFilename(filename) {
+    if (!filename) return 'unknown';
+    return filename
+        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_')
+        .toLowerCase()
+        .substring(0, 50);
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Notification functions
+function notifyDownloadStarted(tabId, username, category) {
+    const message = { action: 'DOWNLOAD_STARTED', username, category };
+    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyProgress(tabId, current, total) {
+    const message = { action: 'UPDATE_PROGRESS', current, total };
+    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyComplete(tabId, count) {
+    const message = { action: 'DOWNLOAD_COMPLETE', count };
+    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadPaused() {
+    const message = { action: 'DOWNLOAD_PAUSED' };
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadResumed() {
+    const message = { action: 'DOWNLOAD_RESUMED' };
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyDownloadCanceled(tabId, count) {
+    const message = { action: 'DOWNLOAD_CANCELED', count: count || 0 };
+    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+function notifyError(tabId, error) {
+    const message = { action: 'DOWNLOAD_ERROR', error };
+    if (tabId) chrome.tabs.sendMessage(tabId, message).catch(() => {});
+    chrome.runtime.sendMessage(message).catch(() => {});
+}
+
+// Handle extension installation
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        console.log('Pixabay Mass Downloader (Enhanced Web Scraper) installed');
+        chrome.storage.local.set({
+            'firstInstall': true,
+            'installDate': new Date().toISOString(),
+            'scrapingMode': true,
+            'version': '2.1'
+        });
+    }
+});

@@ -1,8 +1,9 @@
-// Popup script for Pixabay Mass Downloader - Web Scraping Version
+// Popup script for Pixabay Sound Effects Downloader - Focused Audio Extraction
 let currentUsername = null;
 let currentUserInfo = null;
 let isDownloading = false;
 let isPaused = false;
+let scannedItems = [];
 
 // Initialize immediately when DOM is ready
 document.addEventListener('DOMContentLoaded', initializePopup);
@@ -25,14 +26,8 @@ async function initializePopup() {
 }
 
 function setupEventListeners() {
-    // Category download buttons
-    document.getElementById('photosBtn').addEventListener('click', () => startCategoryDownload('photos'));
-    document.getElementById('illustrationsBtn').addEventListener('click', () => startCategoryDownload('illustrations'));
-    document.getElementById('vectorsBtn').addEventListener('click', () => startCategoryDownload('vectors'));
-    document.getElementById('videosBtn').addEventListener('click', () => startCategoryDownload('videos'));
-    document.getElementById('musicBtn').addEventListener('click', () => startCategoryDownload('music'));
-    document.getElementById('soundEffectsBtn').addEventListener('click', () => startCategoryDownload('sound-effects'));
-    document.getElementById('gifsBtn').addEventListener('click', () => startCategoryDownload('gifs'));
+    // Sound effects download button
+    document.getElementById('soundEffectsBtn').addEventListener('click', () => startSoundEffectsDownload());
     
     // Download control buttons
     document.getElementById('pauseBtn').addEventListener('click', pauseDownload);
@@ -42,10 +37,15 @@ function setupEventListeners() {
     // User profile interactions
     document.getElementById('followBtn').addEventListener('click', followUser);
     
-    // Refresh button
+    // Footer buttons
     document.getElementById('refreshBtn').addEventListener('click', (e) => {
         e.preventDefault();
-        checkCurrentPage();
+        refreshData();
+    });
+    
+    document.getElementById('clearListBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        clearScannedItems();
     });
 }
 
@@ -64,24 +64,24 @@ async function checkCurrentPage() {
         
         console.log('Current tab URL:', activeTab.url);
         
-        if (activeTab.url.includes('pixabay.com/users/')) {
-            currentUsername = extractUsernameFromUrl(activeTab.url);
-            if (currentUsername) {
-                // Get user info from the page itself
-                chrome.runtime.sendMessage({
-                    action: 'GET_USER_INFO',
-                    tabId: activeTab.id
-                });
-                
-                showDownloadSection(currentUsername);
-                updateStatusMessage('?', `Ready to scrape content from: ${currentUsername}`, 'success');
-            } else {
-                updateStatusMessage('??', 'Unable to detect username', 'warning');
+        if (activeTab.url.includes('pixabay.com')) {
+            // Check if we're on a user profile page
+            if (activeTab.url.includes('/users/')) {
+                currentUsername = extractUsernameFromUrl(activeTab.url);
+                if (currentUsername) {
+                    // Get user info from the page itself
+                    chrome.runtime.sendMessage({
+                        action: 'GET_USER_INFO',
+                        tabId: activeTab.id
+                    });
+                }
             }
-        } else if (activeTab.url.includes('pixabay.com')) {
-            updateStatusMessage('??', 'Navigate to a user profile page to start scraping', 'warning');
+            
+            // Show download section regardless of being on user profile
+            showDownloadSection();
+            updateStatusMessage('?', 'Ready to scan sound effects from current page', 'success');
         } else {
-            updateStatusMessage('??', 'Visit a Pixabay user profile to begin scraping', '');
+            updateStatusMessage('??', 'Visit a Pixabay page to scan for sound effects', 'warning');
         }
         
     } catch (error) {
@@ -110,7 +110,7 @@ function updateStatusMessage(icon, message, type = '') {
     statusSection.className = `status-section ${type}`;
 }
 
-function showDownloadSection(username) {
+function showDownloadSection() {
     document.getElementById('downloadSection').classList.remove('hidden');
 }
 
@@ -135,56 +135,53 @@ function showUserInfo(userInfo) {
     console.log('User info displayed:', userInfo);
 }
 
-async function startCategoryDownload(category) {
-    if (!currentUsername || isDownloading) {
-        console.log('Cannot start download:', { currentUsername, isDownloading });
+async function startSoundEffectsDownload() {
+    if (isDownloading) {
+        console.log('Download already in progress');
         return;
     }
     
     isDownloading = true;
     isPaused = false;
     
-    const categoryBtn = document.querySelector(`[data-category="${category}"]`);
-    const originalText = categoryBtn.innerHTML;
+    const downloadBtn = document.getElementById('soundEffectsBtn');
+    const originalText = downloadBtn.innerHTML;
     
     try {
-        console.log(`Starting ${category} download from ${currentUsername}`);
+        console.log('Starting sound effects scan and download');
+        
+        // Clear previous results
+        clearScannedItems();
         
         // Show progress and controls
         showProgress();
         showDownloadControls();
-        categoryBtn.innerHTML = '<div class="spinner"></div> Scanning...';
-        categoryBtn.disabled = true;
-        
-        // Disable all category buttons
-        disableCategoryButtons(true);
+        downloadBtn.innerHTML = '<div class="spinner"></div> Scanning for sound effects...';
+        downloadBtn.disabled = true;
         
         // Get current tab
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        console.log('Sending scrape download message to background script...');
+        console.log('Sending sound effects scan request to background script...');
         
-        // Send message to background script to start scraping
+        // Send message to background script to start scanning
         const response = await chrome.runtime.sendMessage({
-            action: 'START_SCRAPE_DOWNLOAD',
-            category: category,
-            username: currentUsername,
+            action: 'START_SOUND_EFFECTS_SCAN',
             tabId: activeTab.id
         });
         
         console.log('Background script response:', response);
-        updateStatusMessage('??', `Scanning ${category} content from ${currentUsername}...`, 'success');
+        updateStatusMessage('??', 'Scanning current page for sound effects...', 'success');
         
     } catch (error) {
-        console.error('Download error:', error);
-        updateStatusMessage('?', `Download failed: ${error.message}`, 'error');
+        console.error('Scan error:', error);
+        updateStatusMessage('?', `Scan failed: ${error.message}`, 'error');
         hideProgress();
         hideDownloadControls();
         
         // Reset button
-        categoryBtn.innerHTML = originalText;
-        categoryBtn.disabled = false;
-        disableCategoryButtons(false);
+        downloadBtn.innerHTML = originalText;
+        downloadBtn.disabled = false;
         isDownloading = false;
     }
 }
@@ -224,8 +221,7 @@ async function cancelDownload() {
         updateStatusMessage('?', 'Download canceled', 'error');
         hideProgress();
         hideDownloadControls();
-        resetCategoryButtons();
-        disableCategoryButtons(false);
+        resetDownloadButton();
         isDownloading = false;
         isPaused = false;
     } catch (error) {
@@ -237,6 +233,48 @@ function followUser() {
     if (currentUserInfo && currentUserInfo.profileUrl) {
         chrome.tabs.create({ url: currentUserInfo.profileUrl });
     }
+}
+
+async function refreshData() {
+    clearScannedItems();
+    await checkCurrentPage();
+}
+
+function clearScannedItems() {
+    scannedItems = [];
+    updateItemsList();
+    document.getElementById('itemsList').classList.add('hidden');
+}
+
+function showItemsList(items) {
+    scannedItems = items;
+    updateItemsList();
+    document.getElementById('itemsList').classList.remove('hidden');
+    
+    // Update count on button
+    document.getElementById('soundEffectsCount').textContent = items.length;
+}
+
+function updateItemsList() {
+    const container = document.getElementById('itemsContainer');
+    const countEl = document.getElementById('itemsCount');
+    
+    countEl.textContent = `${scannedItems.length} items`;
+    
+    if (scannedItems.length === 0) {
+        container.innerHTML = '<div class="empty-state">No sound effects scanned yet. Click the scan button to start extracting audio from the current page.</div>';
+        return;
+    }
+    
+    container.innerHTML = scannedItems.map((item, index) => `
+        <div class="item-entry">
+            <div class="item-preview">??</div>
+            <div class="item-info">
+                <div class="item-title">${item.title}</div>
+                <div class="item-id">ID: ${item.id}</div>
+            </div>
+        </div>
+    `).join('');
 }
 
 function showProgress() {
@@ -259,13 +297,6 @@ function hideDownloadControls() {
     document.getElementById('downloadControls').classList.add('hidden');
 }
 
-function disableCategoryButtons(disabled) {
-    const buttons = document.querySelectorAll('.category-btn');
-    buttons.forEach(btn => {
-        btn.disabled = disabled;
-    });
-}
-
 function updateProgress(current, total) {
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
@@ -276,8 +307,14 @@ function updateProgress(current, total) {
         progressText.textContent = `${current} / ${total} downloaded (${percentage.toFixed(1)}%)`;
     } else {
         progressFill.style.width = '0%';
-        progressText.textContent = 'Scanning for content...';
+        progressText.textContent = 'Scanning for sound effects...';
     }
+}
+
+function resetDownloadButton() {
+    const downloadBtn = document.getElementById('soundEffectsBtn');
+    downloadBtn.innerHTML = `?? Scan & Download Sound Effects <span class="count">${scannedItems.length}</span>`;
+    downloadBtn.disabled = false;
 }
 
 // Listen for messages from background script
@@ -291,8 +328,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             break;
             
+        case 'SOUND_EFFECTS_SCANNED':
+            if (message.items && message.items.length > 0) {
+                showItemsList(message.items);
+                updateStatusMessage('?', `Found ${message.items.length} sound effects`, 'success');
+            } else {
+                updateStatusMessage('??', 'No sound effects found on this page', 'warning');
+                resetDownloadButton();
+                hideProgress();
+                hideDownloadControls();
+                isDownloading = false;
+            }
+            break;
+            
         case 'DOWNLOAD_STARTED':
-            updateStatusMessage('??', `Downloading ${message.category} from ${message.username}...`, 'success');
+            updateStatusMessage('??', `Downloading ${scannedItems.length} sound effects...`, 'success');
             break;
             
         case 'UPDATE_PROGRESS':
@@ -301,11 +351,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             break;
             
         case 'DOWNLOAD_COMPLETE':
-            updateStatusMessage('?', `Download complete! ${message.count} files downloaded.`, 'success');
+            updateStatusMessage('?', `Download complete! ${message.count} sound effects downloaded.`, 'success');
             hideProgress();
             hideDownloadControls();
-            resetCategoryButtons();
-            disableCategoryButtons(false);
+            resetDownloadButton();
             isDownloading = false;
             isPaused = false;
             break;
@@ -314,8 +363,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             updateStatusMessage('?', `Download canceled. ${message.count || 0} files downloaded.`, 'error');
             hideProgress();
             hideDownloadControls();
-            resetCategoryButtons();
-            disableCategoryButtons(false);
+            resetDownloadButton();
             isDownloading = false;
             isPaused = false;
             break;
@@ -333,34 +381,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             updateStatusMessage('?', `Error: ${message.error}`, 'error');
             hideProgress();
             hideDownloadControls();
-            resetCategoryButtons();
-            disableCategoryButtons(false);
+            resetDownloadButton();
             isDownloading = false;
             isPaused = false;
             break;
+            
+        case 'SCANNING_ERROR':
+            console.error('Scanning error from background:', message.error);
+            updateStatusMessage('?', `Scanning failed: ${message.error}`, 'error');
+            resetDownloadButton();
+            isDownloading = false;
+            break;
     }
 });
-
-function resetCategoryButtons() {
-    // Reset all category buttons
-    const categoryLabels = {
-        'photos': '?? Photos',
-        'illustrations': '?? Illustrations',
-        'vectors': '?? Vectors',
-        'videos': '?? Videos',
-        'music': '?? Music',
-        'sound-effects': '?? Sound FX',
-        'gifs': '??? GIFs'
-    };
-    
-    Object.entries(categoryLabels).forEach(([category, label]) => {
-        const btn = document.querySelector(`[data-category="${category}"]`);
-        if (btn) {
-            btn.innerHTML = label;
-            btn.disabled = false;
-        }
-    });
-}
 
 // Refresh status when popup is opened
 document.addEventListener('visibilitychange', () => {
@@ -370,4 +403,4 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Add debugging
-console.log('Popup script (Web Scraper) loaded successfully');
+console.log('Popup script (Sound Effects Downloader) loaded successfully');
