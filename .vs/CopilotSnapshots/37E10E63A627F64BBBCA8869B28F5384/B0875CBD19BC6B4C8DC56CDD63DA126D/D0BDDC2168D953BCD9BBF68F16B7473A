@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
@@ -258,7 +258,7 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             const soundEffect = soundEffects[i];
             
             try {
-                await downloadSoundEffect(soundEffect, folderName, tabId);
+                await downloadSoundEffect(soundEffect, folderName);
                 downloadedCount++;
                 
                 // Update progress
@@ -299,107 +299,29 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
     }
 }
 
-async function downloadSoundEffect(soundEffect, folderName, tabId) {
+async function downloadSoundEffect(soundEffect, folderName) {
     try {
         let downloadUrl = soundEffect.downloadUrl;
         
-        console.log(`Processing sound effect ${soundEffect.id} with URL: ${downloadUrl}`);
-        
-        // Check if we have a direct audio file URL
-        const isDirectAudioUrl = downloadUrl && (
-            downloadUrl.includes('.mp3') || 
-            downloadUrl.includes('.wav') || 
-            downloadUrl.includes('.ogg') ||
-            downloadUrl.includes('.aac') ||
-            downloadUrl.includes('.m4a') ||
-            downloadUrl.includes('.flac')
-        );
-        
-        if (!isDirectAudioUrl) {
-            console.log(`No direct audio URL found, attempting to extract from page: ${downloadUrl}`);
-            
-            // Try to extract audio URL from the page
-            if (soundEffect.pageUrl || downloadUrl) {
-                try {
-                    const pageUrl = soundEffect.pageUrl || downloadUrl;
-                    const extractedUrl = await extractAudioUrlFromPage(pageUrl);
-                    if (extractedUrl) {
-                        downloadUrl = extractedUrl;
-                        console.log(`Successfully extracted audio URL: ${downloadUrl}`);
-                    }
-                } catch (error) {
-                    console.log(`Failed to extract audio URL from page: ${error.message}`);
-                }
-            }
-            
-            // If still no direct audio URL, try preview URL as fallback
-            if (!isDirectAudioUrl && soundEffect.previewUrl) {
-                console.log(`Using preview URL as fallback: ${soundEffect.previewUrl}`);
+        // If we have a Pixabay item page URL, we might need to navigate to it to get the actual download link
+        if (!downloadUrl || !downloadUrl.includes('.mp3') && !downloadUrl.includes('.wav') && !downloadUrl.includes('.ogg')) {
+            // If we only have the item page URL, use the preview URL or construct a direct link
+            if (soundEffect.previewUrl) {
                 downloadUrl = soundEffect.previewUrl;
+            } else if (soundEffect.downloadUrl && soundEffect.downloadUrl.includes('pixabay.com')) {
+                // Try to construct a direct download URL (this might need adjustment based on Pixabay's URL structure)
+                downloadUrl = soundEffect.downloadUrl;
+            } else {
+                throw new Error(`No suitable download URL found for ${soundEffect.id}`);
             }
         }
         
-        // Validate that we have a downloadable URL
-        if (!downloadUrl) {
-            throw new Error(`No downloadable URL found for ${soundEffect.id}`);
-        }
-        
-        // Create filename with proper extension detection
+        // Create filename
         const safeTitle = sanitizeFilename(soundEffect.title || `sound_effect_${soundEffect.id}`);
-        let extension = getFileExtensionFromUrl(downloadUrl);
-        
-        // If extension detection fails, try to determine from content type
-        if (!extension || extension === 'mp3') {
-            try {
-                const response = await fetch(downloadUrl, { method: 'HEAD' });
-                const contentType = response.headers.get('content-type');
-                if (contentType) {
-                    if (contentType.includes('audio/mpeg')) extension = 'mp3';
-                    else if (contentType.includes('audio/wav')) extension = 'wav';
-                    else if (contentType.includes('audio/ogg')) extension = 'ogg';
-                    else if (contentType.includes('audio/aac')) extension = 'aac';
-                    else if (contentType.includes('audio/mp4')) extension = 'm4a';
-                    else extension = 'mp3'; // Default fallback
-                } else {
-                    extension = 'mp3'; // Default fallback
-                }
-            } catch (error) {
-                console.log(`Could not determine content type for ${downloadUrl}, using mp3`);
-                extension = 'mp3';
-            }
-        }
-        
+        const extension = getFileExtensionFromUrl(downloadUrl) || 'mp3';
         const filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
         
         console.log(`Downloading sound effect: ${filename} from ${downloadUrl}`);
-        
-        // Verify the URL returns audio content
-        try {
-            const testResponse = await fetch(downloadUrl, { method: 'HEAD' });
-            const contentType = testResponse.headers.get('content-type');
-            const contentLength = testResponse.headers.get('content-length');
-            
-            console.log(`URL check - Content-Type: ${contentType}, Content-Length: ${contentLength}`);
-            
-            // If it's not audio content, this might be an image or HTML page
-            if (contentType && !contentType.includes('audio') && !contentType.includes('application/octet-stream')) {
-                console.warn(`Warning: URL may not be audio content. Content-Type: ${contentType}`);
-                
-                // Try to find alternative audio URL or skip
-                if (contentType.includes('text/html')) {
-                    throw new Error(`URL points to HTML page instead of audio file: ${downloadUrl}`);
-                }
-                if (contentType.includes('image')) {
-                    throw new Error(`URL points to image instead of audio file: ${downloadUrl}`);
-                }
-            }
-        } catch (error) {
-            if (error.message.includes('HTML page') || error.message.includes('image')) {
-                throw error; // Re-throw specific errors
-            }
-            // For other errors (like CORS), continue with download attempt
-            console.log(`Could not verify content type, proceeding with download: ${error.message}`);
-        }
         
         // Use Chrome's downloads API
         return new Promise((resolve, reject) => {
@@ -420,94 +342,6 @@ async function downloadSoundEffect(soundEffect, folderName, tabId) {
         });
     } catch (error) {
         console.error(`Error downloading sound effect ${soundEffect.id}:`, error);
-        throw error;
-    }
-}
-
-// Function to extract audio URL from a Pixabay page
-async function extractAudioUrlFromPage(pageUrl) {
-    try {
-        console.log(`Extracting audio URL from: ${pageUrl}`);
-        
-        const response = await fetch(pageUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const html = await response.text();
-        
-        // Enhanced patterns to find audio URLs in Pixabay pages
-        const audioUrlPatterns = [
-            // JSON data patterns
-            /"preview":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /"audioURL":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /"downloadURL":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /"audio":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            
-            // Direct URL patterns
-            /https:\/\/cdn\.pixabay\.com\/audio\/[^"'\s]*\.(?:mp3|wav|ogg)/gi,
-            /https:\/\/pixabay\.com\/[^"'\s]*\.(?:mp3|wav|ogg)/gi,
-            /https:\/\/[^"'\s]*pixabay[^"'\s]*\.(?:mp3|wav|ogg)/gi,
-            
-            // HTML attribute patterns
-            /data-audio[-_]?url=["']([^"']*\.(?:mp3|wav|ogg)[^"']*)["']/gi,
-            /src=["']([^"']*\.(?:mp3|wav|ogg)[^"']*)["']/gi,
-            
-            // General audio file patterns
-            /https:\/\/[^"'\s]*\.mp3/gi,
-            /https:\/\/[^"'\s]*\.wav/gi,
-            /https:\/\/[^"'\s]*\.ogg/gi
-        ];
-        
-        for (const pattern of audioUrlPatterns) {
-            pattern.lastIndex = 0; // Reset regex state
-            const matches = [...html.matchAll(pattern)];
-            
-            if (matches.length > 0) {
-                for (const match of matches) {
-                    let audioUrl = match[1] || match[0];
-                    
-                    // Clean up the URL
-                    audioUrl = audioUrl.replace(/\\"/g, '"').replace(/\\/g, '');
-                    
-                    // Ensure proper protocol
-                    if (audioUrl.startsWith('//')) {
-                        audioUrl = 'https:' + audioUrl;
-                    } else if (audioUrl.startsWith('/')) {
-                        audioUrl = 'https://pixabay.com' + audioUrl;
-                    }
-                    
-                    // Validate the URL looks like an audio file
-                    if (audioUrl.match(/\.(?:mp3|wav|ogg|aac|m4a|flac)(?:\?|$)/i)) {
-                        console.log(`Found potential audio URL: ${audioUrl}`);
-                        
-                        // Try to verify it's actually audio
-                        try {
-                            const testResponse = await fetch(audioUrl, { method: 'HEAD' });
-                            const contentType = testResponse.headers.get('content-type');
-                            
-                            if (!contentType || contentType.includes('audio') || contentType.includes('application/octet-stream')) {
-                                console.log(`Verified audio URL: ${audioUrl}`);
-                                return audioUrl;
-                            }
-                        } catch (verifyError) {
-                            console.log(`Could not verify ${audioUrl}, but will try it anyway`);
-                            return audioUrl; // Sometimes CORS prevents verification but download works
-                        }
-                    }
-                }
-            }
-        }
-        
-        throw new Error('No audio URL found in page content');
-        
-    } catch (error) {
-        console.error(`Failed to extract audio URL from ${pageUrl}:`, error);
         throw error;
     }
 }
@@ -582,7 +416,7 @@ chrome.runtime.onInstalled.addListener((details) => {
             'firstInstall': true,
             'installDate': new Date().toISOString(),
             'scrapingMode': 'sound-effects',
-            'version': '3.1'
+            'version': '3.0'
         });
     }
 });

@@ -1,4 +1,4 @@
-// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader content script loaded');
 
 let isContentScriptActive = false;
@@ -199,7 +199,7 @@ async function extractSoundEffectsWithProgress() {
             const container = overlayContainers[i];
             
             try {
-                const soundEffect = await extractSoundEffectFromOverlayContainer(container, i);
+                const soundEffect = extractSoundEffectFromOverlayContainer(container, i);
                 if (soundEffect) {
                     soundEffects.push(soundEffect);
                     
@@ -220,7 +220,7 @@ async function extractSoundEffectsWithProgress() {
             const audioRow = audioRows[i];
             
             try {
-                const soundEffect = await extractSoundEffectFromRow(audioRow, i);
+                const soundEffect = extractSoundEffectFromRow(audioRow, i);
                 if (soundEffect) {
                     soundEffects.push(soundEffect);
                     
@@ -256,7 +256,7 @@ async function extractSoundEffectsWithProgress() {
                 
                 for (let i = 0; i < elements.length; i++) {
                     try {
-                        const soundEffect = await extractSoundEffectFromGenericElement(elements[i], i);
+                        const soundEffect = extractSoundEffectFromGenericElement(elements[i], i);
                         if (soundEffect) {
                             soundEffects.push(soundEffect);
                         }
@@ -273,7 +273,7 @@ async function extractSoundEffectsWithProgress() {
     return soundEffects;
 }
 
-async function extractSoundEffectFromOverlayContainer(container, index) {
+function extractSoundEffectFromOverlayContainer(container, index) {
     try {
         // Look for links within the overlay container
         const linkElement = container.querySelector('a');
@@ -321,77 +321,18 @@ async function extractSoundEffectFromOverlayContainer(container, index) {
             title = `Sound Effect ${index + 1}`;
         }
         
-        // Try to extract the actual audio file URL
-        let audioFileUrl = '';
-        
-        // Look for direct audio file links or preview URLs
-        const audioSelectors = [
-            'audio source[src]',
-            'audio[src]',
-            '[data-audio-url]',
-            '[data-preview-url]',
-            'source[type*="audio"]'
-        ];
-        
-        for (const selector of audioSelectors) {
-            const audioEl = container.querySelector(selector);
-            if (audioEl) {
-                audioFileUrl = audioEl.src || 
-                              audioEl.getAttribute('data-audio-url') || 
-                              audioEl.getAttribute('data-preview-url') || '';
-                if (audioFileUrl) {
-                    console.log(`Found direct audio URL: ${audioFileUrl}`);
-                    break;
-                }
-            }
-        }
-        
-        // If we have a page URL but no direct audio URL, try to extract from the page
-        if (!audioFileUrl && itemUrl && itemUrl.includes('pixabay.com')) {
-            try {
-                audioFileUrl = await extractAudioUrlFromPage(itemUrl);
-            } catch (error) {
-                console.log(`Could not extract audio URL from page ${itemUrl}:`, error.message);
-            }
-        }
-        
-        // If still no audio URL, try to construct one based on patterns
-        if (!audioFileUrl && itemId && itemId !== `sound_${index}`) {
-            // Try common Pixabay audio URL patterns
-            const possibleUrls = [
-                `https://cdn.pixabay.com/audio/${itemId.slice(-2)}/${itemId}.mp3`,
-                `https://cdn.pixabay.com/download/audio/${itemId}.mp3`,
-                `https://pixabay.com/api/download/audio/${itemId}/?preview=1`
-            ];
-            
-            for (const url of possibleUrls) {
-                try {
-                    const response = await fetch(url, { method: 'HEAD' });
-                    if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                        audioFileUrl = url;
-                        console.log(`Found constructed audio URL: ${audioFileUrl}`);
-                        break;
-                    }
-                } catch (error) {
-                    // Continue trying other URLs
-                }
-            }
-        }
-        
         console.log(`Extracted from overlay container:`, {
             id: itemId,
             title: title,
-            downloadUrl: audioFileUrl || itemUrl,
-            previewUrl: previewUrl,
-            pageUrl: itemUrl
+            downloadUrl: itemUrl,
+            previewUrl: previewUrl
         });
         
         return {
             id: itemId,
             title: title,
-            downloadUrl: audioFileUrl || itemUrl,
+            downloadUrl: itemUrl,
             previewUrl: previewUrl,
-            pageUrl: itemUrl,
             category: 'sound-effects',
             element: container
         };
@@ -402,7 +343,7 @@ async function extractSoundEffectFromOverlayContainer(container, index) {
     }
 }
 
-async function extractSoundEffectFromRow(audioRow, index) {
+function extractSoundEffectFromRow(audioRow, index) {
     try {
         // Find the title using the specific selector you mentioned
         const nameAndTitleEl = audioRow.querySelector('.nameAndTitle--KcBAZ');
@@ -442,8 +383,7 @@ async function extractSoundEffectFromRow(audioRow, index) {
         }
         
         // Try to find download link or audio source
-        let pageUrl = '';
-        let audioFileUrl = '';
+        let downloadUrl = '';
         let itemId = '';
         
         // Look for links to individual sound pages
@@ -457,10 +397,10 @@ async function extractSoundEffectFromRow(audioRow, index) {
         for (const selector of linkSelectors) {
             const link = audioRow.querySelector(selector);
             if (link && link.href) {
-                pageUrl = link.href;
+                downloadUrl = link.href;
                 
                 // Extract ID from URL
-                const idMatch = pageUrl.match(/\/(\d+)/);
+                const idMatch = downloadUrl.match(/\/(\d+)/);
                 if (idMatch) {
                     itemId = idMatch[1];
                 }
@@ -468,38 +408,24 @@ async function extractSoundEffectFromRow(audioRow, index) {
             }
         }
         
-        // Look for direct audio elements or download links
-        const audioSelectors = [
-            'audio source[src]',
-            'audio[src]',
-            'a[href*=".mp3"]',
-            'a[href*=".wav"]',
-            'a[href*=".ogg"]',
-            '[data-src*=".mp3"]',
-            '[data-src*=".wav"]',
-            '[data-audio-url]'
-        ];
-        
-        for (const selector of audioSelectors) {
-            const audioEl = audioRow.querySelector(selector);
-            if (audioEl) {
-                audioFileUrl = audioEl.src || 
-                              audioEl.getAttribute('data-src') || 
-                              audioEl.getAttribute('data-audio-url') || 
-                              audioEl.href || '';
-                if (audioFileUrl) {
-                    console.log(`Found direct audio URL in row: ${audioFileUrl}`);
-                    break;
+        // Look for audio elements or direct download links
+        if (!downloadUrl) {
+            const audioSelectors = [
+                'audio source',
+                'audio[src]',
+                'a[href*=".mp3"]',
+                'a[href*=".wav"]',
+                'a[href*=".ogg"]',
+                '[data-src*=".mp3"]',
+                '[data-src*=".wav"]'
+            ];
+            
+            for (const selector of audioSelectors) {
+                const audioEl = audioRow.querySelector(selector);
+                if (audioEl) {
+                    downloadUrl = audioEl.src || audioEl.getAttribute('data-src') || audioEl.href || '';
+                    if (downloadUrl) break;
                 }
-            }
-        }
-        
-        // If we have page URL but no direct audio URL, try to extract it
-        if (!audioFileUrl && pageUrl) {
-            try {
-                audioFileUrl = await extractAudioUrlFromPage(pageUrl);
-            } catch (error) {
-                console.log(`Could not extract audio URL from page ${pageUrl}:`, error.message);
             }
         }
         
@@ -518,17 +444,15 @@ async function extractSoundEffectFromRow(audioRow, index) {
         console.log(`Extracted sound effect:`, {
             id: itemId,
             title: title,
-            downloadUrl: audioFileUrl || pageUrl,
-            previewUrl: previewUrl,
-            pageUrl: pageUrl
+            downloadUrl: downloadUrl,
+            previewUrl: previewUrl
         });
         
         return {
             id: itemId,
             title: title,
-            downloadUrl: audioFileUrl || pageUrl,
+            downloadUrl: downloadUrl,
             previewUrl: previewUrl,
-            pageUrl: pageUrl,
             category: 'sound-effects',
             element: audioRow
         };
@@ -539,19 +463,18 @@ async function extractSoundEffectFromRow(audioRow, index) {
     }
 }
 
-async function extractSoundEffectFromGenericElement(element, index) {
+function extractSoundEffectFromGenericElement(element, index) {
     try {
         let title = '';
-        let pageUrl = '';
-        let audioFileUrl = '';
+        let downloadUrl = '';
         let previewUrl = '';
         let itemId = `sound_${index}`;
         
         // Try to find any link
         const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
         if (link && link.href) {
-            pageUrl = link.href;
-            const idMatch = pageUrl.match(/\/(\d+)/);
+            downloadUrl = link.href;
+            const idMatch = downloadUrl.match(/\/(\d+)/);
             if (idMatch) {
                 itemId = idMatch[1];
             }
@@ -574,22 +497,12 @@ async function extractSoundEffectFromGenericElement(element, index) {
         // Clean up title (remove extra whitespace, limit length)
         title = title.replace(/\s+/g, ' ').substring(0, 100).trim();
         
-        // Try to extract audio file URL if we have a page URL
-        if (pageUrl) {
-            try {
-                audioFileUrl = await extractAudioUrlFromPage(pageUrl);
-            } catch (error) {
-                console.log(`Could not extract audio URL from page ${pageUrl}:`, error.message);
-            }
-        }
-        
         if (title) {
             return {
                 id: itemId,
                 title: title,
-                downloadUrl: audioFileUrl || pageUrl,
+                downloadUrl: downloadUrl,
                 previewUrl: previewUrl,
-                pageUrl: pageUrl,
                 category: 'sound-effects',
                 element: element
             };
@@ -599,94 +512,6 @@ async function extractSoundEffectFromGenericElement(element, index) {
     } catch (error) {
         console.error(`Error extracting from generic element ${index}:`, error);
         return null;
-    }
-}
-
-// Function to extract actual audio file URL from a Pixabay sound effect page
-async function extractAudioUrlFromPage(pageUrl) {
-    try {
-        console.log(`Attempting to extract audio URL from: ${pageUrl}`);
-        
-        // Fetch the page content
-        const response = await fetch(pageUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const html = await response.text();
-        
-        // Look for common patterns in Pixabay's HTML that contain audio URLs
-        const audioUrlPatterns = [
-            /"preview":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /"audioURL":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /"download":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /data-audio-url="([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /src="([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
-            /https:\/\/cdn\.pixabay\.com\/audio\/[^"']*\.(?:mp3|wav|ogg)/gi,
-            /https:\/\/pixabay\.com\/[^"']*\.(?:mp3|wav|ogg)/gi
-        ];
-        
-        for (const pattern of audioUrlPatterns) {
-            const matches = html.match(pattern);
-            if (matches && matches.length > 0) {
-                // Extract the URL from the first match
-                let audioUrl = matches[0];
-                
-                // Clean up the URL if it's in JSON format
-                if (audioUrl.includes('"')) {
-                    const urlMatch = audioUrl.match(/"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/);
-                    if (urlMatch) {
-                        audioUrl = urlMatch[1];
-                    }
-                }
-                
-                // Clean up data attribute format
-                if (audioUrl.includes('data-audio-url=')) {
-                    const urlMatch = audioUrl.match(/data-audio-url="([^"]*)"/);
-                    if (urlMatch) {
-                        audioUrl = urlMatch[1];
-                    }
-                }
-                
-                // Clean up src attribute format
-                if (audioUrl.includes('src=')) {
-                    const urlMatch = audioUrl.match(/src="([^"]*)"/);
-                    if (urlMatch) {
-                        audioUrl = urlMatch[1];
-                    }
-                }
-                
-                // Ensure the URL is properly formatted
-                if (audioUrl && !audioUrl.startsWith('http')) {
-                    if (audioUrl.startsWith('//')) {
-                        audioUrl = 'https:' + audioUrl;
-                    } else if (audioUrl.startsWith('/')) {
-                        audioUrl = 'https://pixabay.com' + audioUrl;
-                    }
-                }
-                
-                console.log(`Extracted audio URL: ${audioUrl}`);
-                return audioUrl;
-            }
-        }
-        
-        // If no direct audio URL found, look for any MP3/audio references
-        const mp3Matches = html.match(/https:\/\/[^"'\s]*\.mp3/gi);
-        if (mp3Matches && mp3Matches.length > 0) {
-            console.log(`Found MP3 URL: ${mp3Matches[0]}`);
-            return mp3Matches[0];
-        }
-        
-        throw new Error('No audio URL found in page content');
-        
-    } catch (error) {
-        console.error(`Failed to extract audio URL from ${pageUrl}:`, error);
-        throw error;
     }
 }
 
