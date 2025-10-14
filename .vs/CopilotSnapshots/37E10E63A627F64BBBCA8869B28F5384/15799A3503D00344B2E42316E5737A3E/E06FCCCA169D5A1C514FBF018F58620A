@@ -14,7 +14,7 @@
 }
 
 .pixabay-mass-downloader-container {
-    background: var(--pixabay-gray-light);
+    background: white;
     border: 1px solid var(--pixabay-border);
     border-radius: 12px;
     padding: 24px;
@@ -32,7 +32,7 @@
     left: 0;
     right: 0;
     height: 4px;
-    background: var(--pixabay-green);
+    background: linear-gradient(90deg, var(--pixabay-green), var(--pixabay-gray-light));
     border-radius: 12px 12px 0 0;
 }
 

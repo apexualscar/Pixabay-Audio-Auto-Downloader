@@ -1,4 +1,4 @@
-// Background service worker for the Chrome extension
+﻿// Background service worker for the Chrome extension
 console.log('Pixabay Mass Downloader background script loaded');
 
 // Rate limiting variables

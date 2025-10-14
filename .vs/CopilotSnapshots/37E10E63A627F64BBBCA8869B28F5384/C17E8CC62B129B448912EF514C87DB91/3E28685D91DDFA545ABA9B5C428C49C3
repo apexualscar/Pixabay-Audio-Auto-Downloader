@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -29,8 +29,8 @@
             width: 350px;
             height: 500px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--pixabay-gray-light);
-            color: var(--pixabay-gray-dark);
+            background: linear-gradient(135deg, var(--pixabay-green) 0%, var(--pixabay-orange) 100%);
+            color: white;
             overflow: hidden;
         }
         
@@ -50,22 +50,19 @@
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 4px;
-            color: var(--pixabay-green);
         }
         
         .header .subtitle {
             font-size: 12px;
             opacity: 0.8;
-            color: var(--pixabay-gray);
         }
         
         .status-section {
-            background: white;
-            border: 1px solid var(--pixabay-border);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
-            box-shadow: var(--pixabay-shadow);
+            backdrop-filter: blur(10px);
         }
         
         .status-title {
@@ -75,23 +72,20 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            color: var(--pixabay-gray-dark);
         }
         
         .status-message {
             font-size: 12px;
             opacity: 0.9;
             line-height: 1.3;
-            color: var(--pixabay-gray);
         }
         
         .download-section {
-            background: white;
-            border: 1px solid var(--pixabay-border);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
-            box-shadow: var(--pixabay-shadow);
+            backdrop-filter: blur(10px);
             flex: 1;
         }
         
@@ -99,7 +93,6 @@
             font-size: 14px;
             font-weight: 600;
             margin-bottom: 12px;
-            color: var(--pixabay-gray-dark);
         }
         
         .content-type-buttons {
@@ -169,33 +162,26 @@
         }
         
         .api-key-section {
-            background: white;
-            border: 1px solid var(--pixabay-border);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 12px;
-            box-shadow: var(--pixabay-shadow);
+            backdrop-filter: blur(10px);
         }
         
         .api-key-input {
             width: 100%;
             padding: 8px 10px;
-            border: 1px solid var(--pixabay-border);
+            border: none;
             border-radius: 4px;
             font-size: 12px;
             margin-bottom: 8px;
-            background: white;
+            background: rgba(255, 255, 255, 0.9);
             color: var(--pixabay-gray-dark);
         }
         
-        .api-key-input:focus {
-            outline: none;
-            border-color: var(--pixabay-green);
-            box-shadow: 0 0 0 2px rgba(75, 194, 75, 0.1);
-        }
-        
         .progress-bar {
-            background: var(--pixabay-border);
+            background: rgba(255, 255, 255, 0.2);
             border-radius: 10px;
             height: 6px;
             overflow: hidden;
@@ -214,14 +200,13 @@
             font-size: 11px;
             text-align: center;
             opacity: 0.9;
-            color: var(--pixabay-gray);
         }
         
         .spinner {
             width: 12px;
             height: 12px;
-            border: 2px solid var(--pixabay-border);
-            border-top: 2px solid var(--pixabay-green);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -238,33 +223,36 @@
         .footer {
             margin-top: auto;
             padding-top: 12px;
-            border-top: 1px solid var(--pixabay-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
             text-align: center;
         }
         
         .footer a {
-            color: var(--pixabay-gray);
+            color: rgba(255, 255, 255, 0.8);
             text-decoration: none;
             font-size: 11px;
         }
         
         .footer a:hover {
-            color: var(--pixabay-green);
+            color: white;
         }
         
-        .warning .status-section {
-            background: rgba(255, 193, 7, 0.1);
-            border-color: var(--pixabay-orange);
+        .warning {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid var(--pixabay-orange);
+            color: white;
         }
         
-        .success .status-section {
-            background: rgba(75, 194, 75, 0.1);
-            border-color: var(--pixabay-green);
+        .success {
+            background: rgba(40, 167, 69, 0.2);
+            border: 1px solid var(--pixabay-green);
+            color: white;
         }
         
-        .error .status-section {
-            background: rgba(255, 123, 0, 0.1);
-            border-color: var(--pixabay-orange);
+        .error {
+            background: rgba(220, 53, 69, 0.2);
+            border: 1px solid var(--pixabay-orange);
+            color: white;
         }
     </style>
 </head>
@@ -291,7 +279,7 @@
             <input type="password" id="apiKeyInput" class="api-key-input" placeholder="Enter Pixabay API key">
             <button id="saveApiKeyBtn" class="download-btn primary">Save Key</button>
             <div class="status-message" style="margin-top: 8px; font-size: 11px;">
-                Get your free key from <a href="https://pixabay.com/api/docs/" target="_blank" style="color: var(--pixabay-green);">Pixabay API</a>
+                Get your free key from <a href="https://pixabay.com/api/docs/" target="_blank" style="color: #ffd700;">Pixabay API</a>
             </div>
         </div>
         

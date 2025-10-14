@@ -1,4 +1,4 @@
-// Background service worker for the Chrome extension
+﻿// Background service worker for the Chrome extension
 console.log('Pixabay Mass Downloader background script loaded');
 
 // Rate limiting variables
@@ -83,86 +83,50 @@ async function fetchUserSubmissionsWithRateLimit(username, contentType, apiKey) 
             const params = new URLSearchParams({
                 key: apiKey,
                 username: username,
+                category: contentType === 'photo' ? 'all' : contentType,
+                image_type: contentType === 'photo' ? 'all' : undefined,
                 per_page: perPage,
                 page: page,
-                safesearch: 'true',
-                order: 'latest'
+                safesearch: 'true'
             });
             
-            // Handle different content types
-            if (contentType === 'photo') {
-                params.set('category', 'all');
-                params.set('image_type', 'all');
-            } else if (contentType === 'music') {
-                // For music/audio, we need to use different endpoint or parameters
-                // Pixabay's main API is primarily for images, videos have limited support
-                params.set('category', 'music');
-            } else if (contentType === 'video') {
-                // For videos, there might be different API limitations
-                params.set('category', 'all');
-                params.set('video', 'true');
-            } else {
-                // For 'all' content, just get images by default
-                params.set('category', 'all');
-            }
+            // Remove undefined params
+            Array.from(params.entries()).forEach(([key, value]) => {
+                if (value === undefined) params.delete(key);
+            });
             
             const url = `${baseUrl}?${params.toString()}`;
             
-            console.log(`Fetching page ${page} for ${username} (${contentType})...`);
+            console.log(`Fetching page ${page} for ${username}...`);
             
             // Use rate-limited request
             const response = await makeRateLimitedRequest(url);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`API request failed for page ${page}:`, response.status, errorText);
-                
-                // If it's a page out of range error, we've reached the end
-                if (response.status === 400 && errorText.includes('page')) {
-                    console.log(`Reached end of results at page ${page}`);
-                    break;
-                }
-                
                 throw new Error(`API request failed: ${response.status} - ${errorText}`);
             }
             
             const data = await response.json();
             
-            // Check if we have any results
             if (!data.hits || data.hits.length === 0) {
-                console.log(`No more results found at page ${page}`);
                 break; // No more results
             }
             
-            console.log(`Page ${page}: Found ${data.hits.length} submissions (total so far: ${submissions.length + data.hits.length})`);
-            
             submissions.push(...data.hits);
+            console.log(`Page ${page}: Found ${data.hits.length} submissions`);
             
             // If we got less than perPage results, we've reached the end
             if (data.hits.length < perPage) {
-                console.log(`Got fewer results than requested (${data.hits.length} < ${perPage}), reached end`);
-                break;
-            }
-            
-            // Check if we've reached the maximum pages (Pixabay typically limits to ~50 pages)
-            if (page >= 50) {
-                console.log(`Reached maximum page limit (${page}), stopping`);
-                break;
-            }
-            
-            // If total hits is available, check if we've got all possible results
-            if (data.total && submissions.length >= data.total) {
-                console.log(`Got all available results (${submissions.length}/${data.total})`);
                 break;
             }
             
             page++;
             
-            // Respect API rate limits - add delay between requests
-            await sleep(1000); // 1 second delay between pages
+            // Respect API rate limits - small delay between requests
+            await sleep(500);
         }
         
-        console.log(`Finished fetching: found ${submissions.length} total submissions for ${username}`);
         return submissions;
         
     } catch (error) {
@@ -217,12 +181,11 @@ async function processRequestQueue() {
             const response = await fetch(request.url);
             request.resolve(response);
         } catch (error) {
-            console.error(`Request failed: ${error.message}`);
             request.reject(error);
         }
         
         // Small delay between requests
-        await sleep(50); // Increased delay to be more conservative
+        await sleep(20);
     }
     
     isProcessingQueue = false;
