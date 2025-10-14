@@ -1,0 +1,1 @@
+C:\Users\New User\source\repos\Pixabay-Mass-Audio-Downloader\Pixabay-Mass-Audio-Downloader.Client\obj\Debug\net8.0\staticwebassets.build.json

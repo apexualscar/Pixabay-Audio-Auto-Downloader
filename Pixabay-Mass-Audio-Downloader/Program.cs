@@ -1,11 +1,20 @@
 using Pixabay_Mass_Audio_Downloader.Client.Pages;
 using Pixabay_Mass_Audio_Downloader.Components;
+using Pixabay_Mass_Audio_Downloader.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
+
+// Add HTTP client for Pixabay API
+builder.Services.AddHttpClient<PixabayApiService>();
+
+// Add our custom services
+builder.Services.AddScoped<PixabayApiService>();
+builder.Services.AddScoped<DownloadService>();
+builder.Services.AddScoped<SecureStorageService>();
 
 var app = builder.Build();
 

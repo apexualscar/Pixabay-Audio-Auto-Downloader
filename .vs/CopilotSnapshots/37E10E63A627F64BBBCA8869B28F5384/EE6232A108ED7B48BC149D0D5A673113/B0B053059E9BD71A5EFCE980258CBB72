@@ -1,0 +1,314 @@
+﻿@page "/downloader"
+@using Pixabay_Mass_Audio_Downloader.Services
+@inject PixabayApiService PixabayService
+@inject DownloadService DownloadService
+@inject SecureStorageService StorageService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Pixabay Mass Downloader</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-download me-2"></i>
+                        Pixabay Mass Downloader
+                    </h3>
+                </div>
+                <div class="card-body">
+                    @if (!hasApiKey)
+                    {
+                        <div class="alert alert-warning">
+                            <h5><i class="fas fa-key me-2"></i>API Key Required</h5>
+                            <p>Please enter your Pixabay API key to continue. You can get a free API key from the Pixabay API documentation.</p>
+                            
+                            <div class="input-group mb-3">
+                                <input type="password" @bind="apiKeyInput" @onkeypress="HandleApiKeyEnter" 
+                                       class="form-control" placeholder="Enter your Pixabay API key" />
+                                <button class="btn btn-primary" @onclick="SaveApiKey" disabled="@isValidatingKey">
+                                    @if (isValidatingKey)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    <text>Save Key</text>
+                                </button>
+                            </div>
+                            
+                            @if (!string.IsNullOrEmpty(apiKeyError))
+                            {
+                                <div class="alert alert-danger mt-2">
+                                    @apiKeyError
+                                </div>
+                            }
+                            
+                            <small class="text-muted">
+                                <a href="https://pixabay.com/api/docs/" target="_blank" class="text-decoration-none">
+                                    <i class="fas fa-external-link-alt me-1"></i>Get your free Pixabay API key
+                                </a>
+                            </small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Pixabay Username</label>
+                                    <input type="text" @bind="username" class="form-control" id="username" 
+                                           placeholder="Enter Pixabay username" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contentType" class="form-label">Content Type</label>
+                                    <select @bind="selectedContentType" class="form-select" id="contentType">
+                                        <option value="all">All Content</option>
+                                        <option value="photo">Images</option>
+                                        <option value="music">Audio/Music</option>
+                                        <option value="video">Videos</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success" @onclick="StartDownload" disabled="@(isDownloading || string.IsNullOrWhiteSpace(username))">
+                                @if (isDownloading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <text>Downloading...</text>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-download me-2"></i>
+                                    <text>Start Download</text>
+                                }
+                            </button>
+                            
+                            <button class="btn btn-outline-secondary" @onclick="PreviewSubmissions" disabled="@(isLoading || string.IsNullOrWhiteSpace(username))">
+                                @if (isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                    <text>Loading...</text>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-eye me-2"></i>
+                                    <text>Preview</text>
+                                }
+                            </button>
+                            
+                            <button class="btn btn-outline-danger" @onclick="RemoveApiKey">
+                                <i class="fas fa-key me-2"></i>
+                                Change API Key
+                            </button>
+                        </div>
+
+                        @if (downloadProgress != null)
+                        {
+                            <div class="mt-4">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Download Progress</span>
+                                    <span>@downloadProgress.Current / @downloadProgress.Total (@downloadProgress.Percentage.ToString("F1")%)</span>
+                                </div>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" style="width: @(downloadProgress.Percentage)%"></div>
+                                </div>
+                                @if (downloadProgress.CurrentItem != null)
+                                {
+                                    <small class="text-muted">Currently downloading: @downloadProgress.CurrentItem.Id</small>
+                                }
+                            </div>
+                        }
+
+                        @if (submissions.Any())
+                        {
+                            <div class="mt-4">
+                                <h5>Preview (@submissions.Count items found)</h5>
+                                <div class="row">
+                                    @foreach (var submission in submissions.Take(12))
+                                    {
+                                        <div class="col-md-3 col-sm-6 mb-3">
+                                            <div class="card">
+                                                <img src="@submission.PreviewURL" class="card-img-top" alt="Preview" style="height: 120px; object-fit: cover;" />
+                                                <div class="card-body p-2">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-eye me-1"></i>@submission.Views
+                                                        <i class="fas fa-download ms-2 me-1"></i>@submission.Downloads
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                                @if (submissions.Count > 12)
+                                {
+                                    <small class="text-muted">... and @(submissions.Count - 12) more items</small>
+                                }
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(statusMessage))
+                        {
+                            <div class="alert @(statusMessage.Contains("Error") || statusMessage.Contains("Failed") ? "alert-danger" : "alert-info") mt-3">
+                                @statusMessage
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool hasApiKey = false;
+    private bool isValidatingKey = false;
+    private bool isDownloading = false;
+    private bool isLoading = false;
+    private string apiKeyInput = "";
+    private string apiKeyError = "";
+    private string username = "";
+    private string selectedContentType = "all";
+    private string statusMessage = "";
+    private List<PixabayItem> submissions = new();
+    private DownloadProgress? downloadProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hasApiKey = await StorageService.HasApiKeyAsync();
+    }
+
+    private async Task HandleApiKeyEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveApiKey();
+        }
+    }
+
+    private async Task SaveApiKey()
+    {
+        if (string.IsNullOrWhiteSpace(apiKeyInput))
+        {
+            apiKeyError = "Please enter an API key";
+            return;
+        }
+
+        isValidatingKey = true;
+        apiKeyError = "";
+
+        try
+        {
+            var isValid = await PixabayService.ValidateApiKeyAsync(apiKeyInput);
+            
+            if (isValid)
+            {
+                await StorageService.SetApiKeyAsync(apiKeyInput);
+                hasApiKey = true;
+                apiKeyInput = "";
+                statusMessage = "API key saved successfully!";
+            }
+            else
+            {
+                apiKeyError = "Invalid API key. Please check your key and try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            apiKeyError = $"Error validating API key: {ex.Message}";
+        }
+        finally
+        {
+            isValidatingKey = false;
+        }
+    }
+
+    private async Task RemoveApiKey()
+    {
+        await StorageService.RemoveApiKeyAsync();
+        hasApiKey = false;
+        apiKeyInput = "";
+        statusMessage = "API key removed. Please enter a new one.";
+    }
+
+    private async Task PreviewSubmissions()
+    {
+        if (string.IsNullOrWhiteSpace(username))
+            return;
+
+        isLoading = true;
+        statusMessage = "";
+        submissions.Clear();
+
+        try
+        {
+            var apiKey = await StorageService.GetApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                statusMessage = "Error: No API key found";
+                return;
+            }
+
+            submissions = await PixabayService.GetAllUserSubmissionsAsync(apiKey, username, selectedContentType);
+            
+            if (!submissions.Any())
+            {
+                statusMessage = $"No {selectedContentType} submissions found for user '{username}'";
+            }
+            else
+            {
+                statusMessage = $"Found {submissions.Count} {selectedContentType} submissions for '{username}'";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error loading submissions: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task StartDownload()
+    {
+        if (string.IsNullOrWhiteSpace(username))
+            return;
+
+        isDownloading = true;
+        statusMessage = "";
+        downloadProgress = null;
+
+        try
+        {
+            var apiKey = await StorageService.GetApiKeyAsync();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                statusMessage = "Error: No API key found";
+                return;
+            }
+
+            var progress = new Progress<DownloadProgress>(p =>
+            {
+                downloadProgress = p;
+                InvokeAsync(StateHasChanged);
+            });
+
+            var downloadedCount = await DownloadService.DownloadUserSubmissionsAsync(apiKey, username, selectedContentType, progress);
+            
+            statusMessage = $"Download completed! {downloadedCount} files downloaded successfully.";
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Download failed: {ex.Message}";
+        }
+        finally
+        {
+            isDownloading = false;
+            downloadProgress = null;
+        }
+    }
+}
