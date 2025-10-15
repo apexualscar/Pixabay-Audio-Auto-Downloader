@@ -1,15 +1,8 @@
-// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader content script loaded');
 
 let isContentScriptActive = false;
 let scrapingInProgress = false;
-
-// Store target info for consistent folder naming
-let targetInfo = {
-    targetName: 'unknown',
-    targetID: 'unknown',
-    extracted: false
-};
 
 // Initialize content script
 function initializeContentScript() {
@@ -22,90 +15,11 @@ function initializeContentScript() {
     if (window.location.hostname.includes('pixabay.com')) {
         console.log('Pixabay page detected');
         
-        // Extract and store target info immediately
-        extractAndStoreTargetInfo();
-        
         // Add visual indicators that scraping is available
         addScrapingIndicators();
         
         // Listen for messages from background script
         chrome.runtime.onMessage.addListener(handleBackgroundMessage);
-    }
-}
-
-function extractAndStoreTargetInfo() {
-    try {
-        console.log('Extracting target information for folder naming...');
-        
-        const url = window.location.href;
-        const pathname = window.location.pathname;
-        
-        // Extract username and ID from URL
-        const userMatch = pathname.match(/\/users\/([^\/\?]+)/);
-        if (userMatch) {
-            targetInfo.targetName = decodeURIComponent(userMatch[1]);
-            targetInfo.targetID = decodeURIComponent(userMatch[1]); // Use username as ID initially
-            
-            console.log(`Extracted target info from URL - Name: ${targetInfo.targetName}, ID: ${targetInfo.targetID}`);
-        }
-        
-        // Try to extract numeric user ID from page elements for better targeting
-        const userIdSelectors = [
-            '[data-user-id]',
-            '[data-id]',
-            '.user-id',
-            '#user-id',
-            '[class*="user-id"]'
-        ];
-        
-        for (const selector of userIdSelectors) {
-            const element = document.querySelector(selector);
-            if (element) {
-                const id = element.getAttribute('data-user-id') || 
-                          element.getAttribute('data-id') || 
-                          element.textContent?.trim();
-                if (id && /^\d+$/.test(id)) {
-                    targetInfo.targetID = id;
-                    console.log(`Found numeric user ID: ${targetInfo.targetID}`);
-                    break;
-                }
-            }
-        }
-        
-        // Also try to get display name from page elements
-        const nameSelectors = [
-            '.h1--bZ6EI.L--opXRs', // Primary selector for user name
-            '.h1--bZ6EI',          // Fallback without second class
-            'h1.h1--bZ6EI',        // With h1 tag
-            '.user-name',
-            '.profile-name',
-            'h1',
-            'h2'
-        ];
-        
-        for (const selector of nameSelectors) {
-            const nameEl = document.querySelector(selector);
-            if (nameEl && nameEl.textContent?.trim()) {
-                const displayName = nameEl.textContent.trim();
-                // Use display name if it's different and more descriptive
-                if (displayName !== targetInfo.targetName && displayName.length > 2) {
-                    targetInfo.targetName = displayName;
-                    console.log(`Updated target name from page: ${targetInfo.targetName}`);
-                }
-                break;
-            }
-        }
-        
-        targetInfo.extracted = true;
-        console.log('Final target info:', targetInfo);
-        
-    } catch (error) {
-        console.error('Error extracting target info:', error);
-        targetInfo = {
-            targetName: 'unknown',
-            targetID: 'unknown',
-            extracted: true
-        };
     }
 }
 
@@ -128,7 +42,7 @@ function addScrapingIndicators() {
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         ">
-            PeX Audio Scraper Ready (${targetInfo.targetName || 'Unknown'})
+            PeX Audio Scraper Ready
         </div>
     `;
     
@@ -166,11 +80,6 @@ async function scanSoundEffectsFromCurrentPage() {
     try {
         console.log('Starting to scan sound effects from current page...');
         
-        // Ensure target info is extracted
-        if (!targetInfo.extracted) {
-            extractAndStoreTargetInfo();
-        }
-        
         // Show scanning indicator
         showScrapingProgress('Scanning for sound effects...');
         
@@ -180,16 +89,15 @@ async function scanSoundEffectsFromCurrentPage() {
         // Scroll to load all content
         await scrollToLoadAll();
         
-        // Extract sound effects using optimized selectors
+        // Extract sound effects using specific selectors
         const soundEffects = await extractSoundEffectsWithProgress();
         
         console.log(`Successfully extracted ${soundEffects.length} sound effects`);
         
-        // Send results back to background script with target info
+        // Send results back to background script
         chrome.runtime.sendMessage({
             action: 'SOUND_EFFECTS_EXTRACTED',
-            items: soundEffects,
-            targetInfo: targetInfo // Include target info for folder naming
+            items: soundEffects
         });
         
         hideScrapingProgress();
@@ -228,7 +136,7 @@ async function scrollToLoadAll() {
         const maxScrolls = 50; // Reduced since we're looking for specific elements
         
         function scrollStep() {
-            // Count current sound effect items using optimized selector
+            // Count current sound effect items
             const currentItemCount = countSoundEffectsOnCurrentPage();
             
             // Check if new items loaded
@@ -263,39 +171,35 @@ async function scrollToLoadAll() {
 }
 
 function countSoundEffectsOnCurrentPage() {
-    // OPTIMIZED: Only scan elements with class container--qiTbg
-    const optimizedContainers = document.querySelectorAll('.container--qiTbg');
-    console.log(`Found ${optimizedContainers.length} optimized containers with class "container--qiTbg"`);
+    // Count items using the specific selectors you provided
+    const audioContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
+    const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
     
-    // Fallback to previous selectors if optimized selector finds nothing
-    if (optimizedContainers.length === 0) {
-        const audioContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
-        const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-        console.log(`Fallback: Found ${audioContainers.length} overlay containers and ${audioRows.length} audio rows`);
-        return Math.max(audioContainers.length, audioRows.length);
-    }
-    
-    return optimizedContainers.length;
+    // Return the higher count as fallback
+    return Math.max(audioContainers.length, audioRows.length);
 }
 
 async function extractSoundEffectsWithProgress() {
-    console.log('Extracting sound effects using optimized selectors...');
+    console.log('Extracting sound effects using specific selectors...');
     showScrapingProgress('Analyzing sound effects...');
     
     const soundEffects = [];
     
-    // OPTIMIZED: First try the optimized selector for container--qiTbg
-    const optimizedContainers = document.querySelectorAll('.container--qiTbg');
-    console.log(`Found ${optimizedContainers.length} optimized containers with class "container--qiTbg"`);
+    // Use the specific selectors you mentioned for sound effect items
+    const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
+    console.log(`Found ${overlayContainers.length} overlay containers with classes "overlayContainer--0ZpHP lazyImg--u6+yh"`);
     
-    if (optimizedContainers.length > 0) {
-        console.log('Using optimized container--qiTbg selector for extraction');
-        
-        for (let i = 0; i < optimizedContainers.length; i++) {
-            const container = optimizedContainers[i];
+    // Also try the original audioRow selector as fallback
+    const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+    console.log(`Found ${audioRows.length} audio rows with class "audioRow--nAm4Z"`);
+    
+    // Process overlay containers first (your new selector)
+    if (overlayContainers.length > 0) {
+        for (let i = 0; i < overlayContainers.length; i++) {
+            const container = overlayContainers[i];
             
             try {
-                const soundEffect = await extractSoundEffectFromOptimizedContainer(container, i);
+                const soundEffect = await extractSoundEffectFromOverlayContainer(container, i);
                 if (soundEffect) {
                     soundEffects.push(soundEffect);
                     
@@ -305,198 +209,68 @@ async function extractSoundEffectsWithProgress() {
                     }
                 }
             } catch (error) {
-                console.error(`Error processing optimized container ${i}:`, error);
+                console.error(`Error processing overlay container ${i}:`, error);
             }
         }
     }
     
-    // Fallback: Use previous selectors if optimized didn't find anything
-    if (soundEffects.length === 0) {
-        console.log('No sound effects found with optimized selector, using fallback selectors...');
-        
-        // Use the specific selectors you mentioned for sound effect items
-        const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
-        console.log(`Found ${overlayContainers.length} overlay containers with classes "overlayContainer--0ZpHP lazyImg--u6+yh"`);
-        
-        // Also try the original audioRow selector as fallback
-        const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-        console.log(`Found ${audioRows.length} audio rows with class "audioRow--nAm4Z"`);
-        
-        // Process overlay containers first (your new selector)
-        if (overlayContainers.length > 0) {
-            for (let i = 0; i < overlayContainers.length; i++) {
-                const container = overlayContainers[i];
-                
-                try {
-                    const soundEffect = await extractSoundEffectFromOverlayContainer(container, i);
-                    if (soundEffect) {
-                        soundEffects.push(soundEffect);
-                        
-                        // Update progress every 10 items
-                        if (soundEffects.length % 10 === 0) {
-                            showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
-                        }
+    // If no overlay containers found, try audioRows as fallback
+    if (soundEffects.length === 0 && audioRows.length > 0) {
+        for (let i = 0; i < audioRows.length; i++) {
+            const audioRow = audioRows[i];
+            
+            try {
+                const soundEffect = await extractSoundEffectFromRow(audioRow, i);
+                if (soundEffect) {
+                    soundEffects.push(soundEffect);
+                    
+                    // Update progress every 10 items
+                    if (soundEffects.length % 10 === 0) {
+                        showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
                     }
-                } catch (error) {
-                    console.error(`Error processing overlay container ${i}:`, error);
                 }
+            } catch (error) {
+                console.error(`Error processing audio row ${i}:`, error);
             }
         }
+    }
+    
+    // If still no results, try alternative selectors
+    if (soundEffects.length === 0) {
+        console.log('No sound effects found with primary selectors, trying alternatives...');
         
-        // If no overlay containers found, try audioRows as fallback
-        if (soundEffects.length === 0 && audioRows.length > 0) {
-            for (let i = 0; i < audioRows.length; i++) {
-                const audioRow = audioRows[i];
+        const alternativeSelectors = [
+            '[class*="overlayContainer"]',
+            '[class*="audioRow"]',
+            '[class*="audio-row"]',
+            '[class*="sound-row"]',
+            '.audio-item',
+            '.sound-item',
+            '.media-item[data-type="audio"]'
+        ];
+        
+        for (const selector of alternativeSelectors) {
+            const elements = document.querySelectorAll(selector);
+            if (elements.length > 0) {
+                console.log(`Found ${elements.length} items using fallback selector: ${selector}`);
                 
-                try {
-                    const soundEffect = await extractSoundEffectFromRow(audioRow, i);
-                    if (soundEffect) {
-                        soundEffects.push(soundEffect);
-                        
-                        // Update progress every 10 items
-                        if (soundEffects.length % 10 === 0) {
-                            showScrapingProgress(`Extracted ${soundEffects.length} sound effects...`);
+                for (let i = 0; i < elements.length; i++) {
+                    try {
+                        const soundEffect = await extractSoundEffectFromGenericElement(elements[i], i);
+                        if (soundEffect) {
+                            soundEffects.push(soundEffect);
                         }
+                    } catch (error) {
+                        console.error(`Error processing element ${i}:`, error);
                     }
-                } catch (error) {
-                    console.error(`Error processing audio row ${i}:`, error);
                 }
+                break;
             }
         }
     }
     
     console.log(`Successfully extracted ${soundEffects.length} sound effects`);
     return soundEffects;
-}
-
-// NEW: Optimized extraction function for container--qiTbg elements
-async function extractSoundEffectFromOptimizedContainer(container, index) {
-    try {
-        // Look for links within the optimized container
-        const linkElement = container.querySelector('a');
-        let itemUrl = linkElement ? linkElement.href : '';
-        let itemId = `sound_${index}`;
-        
-        // Extract ID from URL if available
-        if (itemUrl) {
-            const idMatch = itemUrl.match(/\/(\d+)/);
-            if (idMatch) {
-                itemId = idMatch[1];
-            }
-        }
-        
-        // Look for image within the container
-        const imgElement = container.querySelector('img');
-        let previewUrl = '';
-        let title = '';
-        
-        if (imgElement) {
-            previewUrl = imgElement.src || imgElement.getAttribute('data-src') || '';
-            title = imgElement.alt || imgElement.title || '';
-        }
-        
-        // Try to find title from nearby elements or link text
-        if (!title && linkElement) {
-            title = linkElement.getAttribute('title') || 
-                   linkElement.textContent?.trim() || '';
-        }
-        
-        // Look for any text content within the container
-        if (!title) {
-            const textElements = container.querySelectorAll('span, div, p');
-            for (const textEl of textElements) {
-                const text = textEl.textContent?.trim();
-                if (text && text.length > 2 && text.length < 100) {
-                    title = text;
-                    break;
-                }
-            }
-        }
-        
-        // Generate fallback title if none found
-        if (!title) {
-            title = `Sound Effect ${index + 1}`;
-        }
-        
-        // Try to extract the actual audio file URL
-        let audioFileUrl = '';
-        
-        // Look for direct audio file links or preview URLs
-        const audioSelectors = [
-            'audio source[src]',
-            'audio[src]',
-            '[data-audio-url]',
-            '[data-preview-url]',
-            'source[type*="audio"]'
-        ];
-        
-        for (const selector of audioSelectors) {
-            const audioEl = container.querySelector(selector);
-            if (audioEl) {
-                audioFileUrl = audioEl.src || 
-                              audioEl.getAttribute('data-audio-url') || 
-                              audioEl.getAttribute('data-preview-url') || '';
-                if (audioFileUrl) {
-                    console.log(`Found direct audio URL: ${audioFileUrl}`);
-                    break;
-                }
-            }
-        }
-        
-        // If we have a page URL but no direct audio URL, try to extract from the page
-        if (!audioFileUrl && itemUrl && itemUrl.includes('pixabay.com')) {
-            try {
-                audioFileUrl = await extractAudioUrlFromPage(itemUrl);
-            } catch (error) {
-                console.log(`Could not extract audio URL from page ${itemUrl}:`, error.message);
-            }
-        }
-        
-        // If still no audio URL, try to construct one based on patterns
-        if (!audioFileUrl && itemId && itemId !== `sound_${index}`) {
-            // Try common Pixabay audio URL patterns
-            const possibleUrls = [
-                `https://cdn.pixabay.com/audio/${itemId.slice(-2)}/${itemId}.mp3`,
-                `https://cdn.pixabay.com/download/audio/${itemId}.mp3`,
-                `https://pixabay.com/api/download/audio/${itemId}/?preview=1`
-            ];
-            
-            for (const url of possibleUrls) {
-                try {
-                    const response = await fetch(url, { method: 'HEAD' });
-                    if (response.ok && response.headers.get('content-type')?.includes('audio')) {
-                        audioFileUrl = url;
-                        console.log(`Found constructed audio URL: ${audioFileUrl}`);
-                        break;
-                    }
-                } catch (error) {
-                    // Continue trying other URLs
-                }
-            }
-        }
-        
-        console.log(`Extracted from optimized container:`, {
-            id: itemId,
-            title: title,
-            downloadUrl: audioFileUrl || itemUrl,
-            previewUrl: previewUrl,
-            pageUrl: itemUrl
-        });
-        
-        return {
-            id: itemId,
-            title: title,
-            downloadUrl: audioFileUrl || itemUrl,
-            previewUrl: previewUrl,
-            pageUrl: itemUrl,
-            category: 'sound-effects',
-            element: container
-        };
-        
-    } catch (error) {
-        console.error(`Error extracting from optimized container ${index}:`, error);
-        return null;
-    }
 }
 
 async function extractSoundEffectFromOverlayContainer(container, index) {
@@ -765,6 +539,69 @@ async function extractSoundEffectFromRow(audioRow, index) {
     }
 }
 
+async function extractSoundEffectFromGenericElement(element, index) {
+    try {
+        let title = '';
+        let pageUrl = '';
+        let audioFileUrl = '';
+        let previewUrl = '';
+        let itemId = `sound_${index}`;
+        
+        // Try to find any link
+        const link = element.querySelector('a') || (element.tagName === 'A' ? element : null);
+        if (link && link.href) {
+            pageUrl = link.href;
+            const idMatch = pageUrl.match(/\/(\d+)/);
+            if (idMatch) {
+                itemId = idMatch[1];
+            }
+        }
+        
+        // Try to find any image
+        const img = element.querySelector('img');
+        if (img) {
+            previewUrl = img.src || img.getAttribute('data-src') || '';
+            if (!title) {
+                title = img.alt || img.title || '';
+            }
+        }
+        
+        // Try to find text content
+        if (!title) {
+            title = element.textContent?.trim() || `Sound Effect ${index + 1}`;
+        }
+        
+        // Clean up title (remove extra whitespace, limit length)
+        title = title.replace(/\s+/g, ' ').substring(0, 100).trim();
+        
+        // Try to extract audio file URL if we have a page URL
+        if (pageUrl) {
+            try {
+                audioFileUrl = await extractAudioUrlFromPage(pageUrl);
+            } catch (error) {
+                console.log(`Could not extract audio URL from page ${pageUrl}:`, error.message);
+            }
+        }
+        
+        if (title) {
+            return {
+                id: itemId,
+                title: title,
+                downloadUrl: audioFileUrl || pageUrl,
+                previewUrl: previewUrl,
+                pageUrl: pageUrl,
+                category: 'sound-effects',
+                element: element
+            };
+        }
+        
+        return null;
+    } catch (error) {
+        console.error(`Error extracting from generic element ${index}:`, error);
+        return null;
+    }
+}
+
 // Function to extract actual audio file URL from a Pixabay sound effect page
 async function extractAudioUrlFromPage(pageUrl) {
     try {
@@ -921,7 +758,6 @@ setInterval(() => {
     if (window.location.href !== currentUrl) {
         currentUrl = window.location.href;
         isContentScriptActive = false;
-        targetInfo = { targetName: 'unknown', targetID: 'unknown', extracted: false }; // Reset target info
         setTimeout(initializeContentScript, 1000);
     }
 }, 2000);
