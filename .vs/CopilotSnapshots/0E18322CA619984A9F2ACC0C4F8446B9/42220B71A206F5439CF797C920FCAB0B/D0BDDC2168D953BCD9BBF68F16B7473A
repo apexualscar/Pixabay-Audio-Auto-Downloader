@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
@@ -7,6 +7,12 @@ let isDownloadCanceled = false;
 let currentDownloadSession = null;
 let downloadQueue = [];
 let scannedSoundEffects = []; // Store scanned items separately
+
+// Store target info for consistent folder naming across session
+let currentTargetInfo = {
+    targetName: 'unknown',
+    targetID: 'unknown'
+};
 
 // Popup state persistence variables
 let extensionState = {
@@ -200,7 +206,7 @@ function extractUserInfoFromPage() {
     }
 }
 
-// Function to check login status by looking for "Logout" text
+// NEW: Function to check login status by looking for "Logout" text
 function checkLoginStatus() {
     try {
         // Look for "Logout" text in various elements
@@ -325,12 +331,21 @@ async function handleSoundEffectsScan(request, tabId) {
 }
 
 function handleSoundEffectsExtracted(message, tabId) {
-    const { items } = message;
+    const { items, targetInfo } = message;
     
     console.log(`Sound effects extracted: ${items.length} items`);
     
     // Store scanned items for later download
     scannedSoundEffects = items;
+    
+    // IMPORTANT: Store target info for consistent folder naming
+    if (targetInfo) {
+        currentTargetInfo = {
+            targetName: sanitizeFilename(targetInfo.targetName || 'unknown'),
+            targetID: sanitizeFilename(targetInfo.targetID || 'unknown')
+        };
+        console.log('Target info stored for folder naming:', currentTargetInfo);
+    }
     
     // Update state
     updateExtensionState({
@@ -477,9 +492,23 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             count: totalCount
         });
         
-        // Create organized folder structure based on page info
+        // IMPROVED: Create organized folder structure using stored target info
         let folderName = 'pixabay_sound_effects';
-        if (pageInfo) {
+        
+        // Use stored target info for consistent folder naming
+        if (currentTargetInfo.targetName !== 'unknown' || currentTargetInfo.targetID !== 'unknown') {
+            const safeName = currentTargetInfo.targetName;
+            const safeID = currentTargetInfo.targetID;
+            
+            if (pageInfo && pageInfo.pageNumber > 1) {
+                // Include page info if multiple pages
+                folderName = `pixabay_sound_effects/${safeName}-${safeID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
+            } else {
+                // Simple folder structure for single page
+                folderName = `pixabay_sound_effects/${safeName}-${safeID}`;
+            }
+        } else if (pageInfo && pageInfo.targetName !== 'unknown') {
+            // Fallback to page info if stored target info not available
             folderName = `pixabay_sound_effects/${pageInfo.targetName}-${pageInfo.targetID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
         }
         
@@ -603,8 +632,8 @@ function clickAllLikeButtons() {
             
             allLikeButtons.forEach((button, index) => {
                 try {
-                    // Find the sound effect container
-                    const container = button.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"], .likeButtonWrapper--yrNJw');
+                    // OPTIMIZED: Look for optimized container first
+                    const container = button.closest('.container--qiTbg, .overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"], .likeButtonWrapper--yrNJw');
                     
                     if (container) {
                         // Only store one button per container (to avoid clicking multiple buttons in same item)

@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
