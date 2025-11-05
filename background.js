@@ -435,22 +435,6 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             }
         }
         
-        // Extract page information for organized folder structure
-        let pageInfo = null;
-        try {
-            const pageInfoResults = await chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                function: extractPageInfoFromPage
-            });
-            
-            if (pageInfoResults && pageInfoResults[0] && pageInfoResults[0].result) {
-                pageInfo = pageInfoResults[0].result;
-                console.log('Extracted page info for folder structure:', pageInfo);
-            }
-        } catch (error) {
-            console.error('Error extracting page info:', error);
-        }
-        
         // Auto-like ALL sound effects at once if enabled and user is logged in
         if (autoLikeEnabled && userIsLoggedIn) {
             console.log('Auto-like enabled and user logged in - liking ALL sound effects at once');
@@ -477,9 +461,23 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             count: totalCount
         });
         
-        // Create organized folder structure based on page info
+        // IMPROVED: Create organized folder structure using stored target info
         let folderName = 'pixabay_sound_effects';
-        if (pageInfo) {
+        
+        // Use stored target info for consistent folder naming
+        if (currentTargetInfo.targetName !== 'unknown' || currentTargetInfo.targetID !== 'unknown') {
+            const safeName = currentTargetInfo.targetName;
+            const safeID = currentTargetInfo.targetID;
+            
+            if (pageInfo && pageInfo.pageNumber > 1) {
+                // Include page info if multiple pages
+                folderName = `pixabay_sound_effects/${safeName}-${safeID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
+            } else {
+                // Simple folder structure for single page
+                folderName = `pixabay_sound_effects/${safeName}-${safeID}`;
+            }
+        } else if (pageInfo && pageInfo.targetName !== 'unknown') {
+            // Fallback to page info if stored target info not available
             folderName = `pixabay_sound_effects/${pageInfo.targetName}-${pageInfo.targetID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
         }
         
@@ -679,6 +677,105 @@ function clickAllLikeButtons() {
     } catch (error) {
         console.error('Error in bulk auto-like:', error);
         return 0;
+    }
+}
+
+// Legacy function kept for backward compatibility (no longer used)
+async function autoLikeSoundEffect(soundEffect, tabId) {
+    try {
+        console.log(`Auto-liking sound effect: ${soundEffect.id}`);
+        
+        await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: clickLikeButton,
+            args: [soundEffect.id]
+        });
+        
+        // Small delay after liking
+        await sleep(200);
+        
+    } catch (error) {
+        console.log(`Could not auto-like sound effect ${soundEffect.id}: ${error.message}`);
+    }
+}
+
+// Legacy function kept for backward compatibility (no longer used)
+function clickLikeButton(soundEffectId) {
+    try {
+        console.log(`Looking for like button for sound effect: ${soundEffectId}`);
+        
+        // First, try to find the sound effect element specifically
+        const soundEffectElement = document.querySelector(`[data-id="${soundEffectId}"]`) || 
+                                 document.querySelector(`#sound-${soundEffectId}`) ||
+                                 document.querySelector(`[href*="${soundEffectId}"]`);
+        
+        if (soundEffectElement) {
+            console.log(`Found sound effect element for ${soundEffectId}`);
+            
+            // Find the container that holds this sound effect
+            const container = soundEffectElement.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"]');
+            
+            if (container) {
+                console.log(`Found container for sound effect ${soundEffectId}`);
+                
+                // Find ALL like buttons within this specific container
+                const likeButtonsInContainer = container.querySelectorAll('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+                
+                console.log(`Found ${likeButtonsInContainer.length} like buttons in container for ${soundEffectId}`);
+                
+                if (likeButtonsInContainer.length >= 2) {
+                    // Click the SECOND like button (index 1) - this should be the actual like button
+                    console.log(`Clicking SECOND like button for sound effect ${soundEffectId}`);
+                    likeButtonsInContainer[1].click();
+                    return true;
+                } else if (likeButtonsInContainer.length === 1) {
+                    // If only one button, click it (fallback)
+                    console.log(`Only one like button found, clicking it for ${soundEffectId}`);
+                    likeButtonsInContainer[0].click();
+                    return true;
+                }
+            }
+        }
+        
+        // Fallback: Look for all like buttons and target second instances globally
+        const allLikeButtons = document.querySelectorAll('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+        console.log(`Fallback: Found ${allLikeButtons.length} total like buttons on page`);
+        
+        // Group buttons by their containers to find second instances
+        const containerButtonMap = new Map();
+        
+        allLikeButtons.forEach((button, index) => {
+            const container = button.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"]');
+            if (container) {
+                if (!containerButtonMap.has(container)) {
+                    containerButtonMap.set(container, []);
+                }
+                containerButtonMap.get(container).push({ button, index });
+            }
+        });
+        
+        // Click second button in each container that has multiple buttons
+        for (const [container, buttons] of containerButtonMap.entries()) {
+            if (buttons.length >= 2) {
+                console.log(`Clicking second like button in container (fallback approach)`);
+                buttons[1].button.click();
+                return true;
+            }
+        }
+        
+        // Final fallback: click first available button
+        if (allLikeButtons.length > 0) {
+            console.log(`Final fallback: clicking first available like button`);
+            allLikeButtons[0].click();
+            return true;
+        }
+        
+        console.log(`No like buttons found for sound effect ${soundEffectId}`);
+        return false;
+        
+    } catch (error) {
+        console.error(`Error clicking like button for ${soundEffectId}:`, error);
+        return false;
     }
 }
 
