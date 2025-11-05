@@ -1,4 +1,4 @@
-// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Content script for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader content script loaded');
 
 let isContentScriptActive = false;

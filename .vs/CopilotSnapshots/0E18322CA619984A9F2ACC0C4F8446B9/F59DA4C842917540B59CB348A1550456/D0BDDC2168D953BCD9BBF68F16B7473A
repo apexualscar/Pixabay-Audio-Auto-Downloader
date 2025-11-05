@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
@@ -692,18 +692,12 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
         });
         
         // Create organized folder structure based on page info
-        let folderName = 'PixabayAudio';
+        let folderName = 'pixabay_sound_effects';
         if (pageInfo) {
-            // Create a cleaner folder structure that's more likely to work
-            const cleanTargetName = sanitizeFilename(pageInfo.targetName);
-            const pageStr = pageInfo.pageNumber > 1 ? `_Page${pageInfo.pageNumber}` : '';
-            folderName = `PixabayAudio/${cleanTargetName}${pageStr}`;
+            folderName = `pixabay_sound_effects/${pageInfo.targetName}-${pageInfo.targetID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
         }
         
         console.log(`Using organized folder structure: ${folderName}`);
-        
-        // Test folder creation capability with first download
-        let folderWorking = true;
         
         for (let i = 0; i < soundEffects.length; i++) {
             // Check for cancel/pause
@@ -722,9 +716,7 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             const soundEffect = soundEffects[i];
             
             try {
-                // For first few downloads, test if folder structure works
-                const useFolderStructure = folderWorking && i < 3;
-                await downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure);
+                await downloadSoundEffect(soundEffect, folderName, tabId);
                 downloadedCount++;
                 
                 // Update progress and state
@@ -744,12 +736,6 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
                 
             } catch (error) {
                 console.error(`Failed to download ${soundEffect.id}:`, error);
-                
-                // If folder-related error and we're still testing, disable folder structure
-                if (folderWorking && (error.message.includes('path') || error.message.includes('folder') || error.message.includes('directory'))) {
-                    console.log('Folder structure failed, switching to flat file structure for remaining downloads');
-                    folderWorking = false;
-                }
                 // Continue with next file
             }
         }
@@ -792,7 +778,145 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
     }
 }
 
-async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure = true) {
+// Function to click ALL like buttons for ALL sound effects at once
+function clickAllLikeButtons() {
+    try {
+        console.log('Starting bulk auto-like for ALL sound effects');
+        
+        let likedCount = 0;
+        
+        // Method 1: Look for like buttons within likeButtonWrapper elements
+        const likeWrappers = document.querySelectorAll('.likeButtonWrapper--yrNJw');
+        console.log(`Found ${likeWrappers.length} like button wrappers`);
+        
+        likeWrappers.forEach((wrapper, index) => {
+            try {
+                // Find the like button within this wrapper
+                const likeButton = wrapper.querySelector('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+                if (likeButton) {
+                    console.log(`Clicking like button ${index + 1} in wrapper`);
+                    likeButton.click();
+                    likedCount++;
+                } else {
+                    console.log(`No like button found in wrapper ${index + 1}`);
+                }
+            } catch (error) {
+                console.error(`Error clicking like button in wrapper ${index + 1}:`, error);
+            }
+        });
+        
+        // Method 2: Fallback - find all like buttons and group by containers
+        if (likedCount === 0) {
+            console.log('No wrappers found, using fallback method');
+            
+            const allLikeButtons = document.querySelectorAll('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+            console.log(`Found ${allLikeButtons.length} total like buttons on page`);
+            
+            // Group buttons by their parent containers to avoid duplicates
+            const containerButtonMap = new Map();
+            
+            allLikeButtons.forEach((button, index) => {
+                try {
+                    // Find the sound effect container
+                    const container = button.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"], .likeButtonWrapper--yrNJw');
+                    
+                    if (container) {
+                        // Only store one button per container (to avoid clicking multiple buttons in same item)
+                        if (!containerButtonMap.has(container)) {
+                            containerButtonMap.set(container, button);
+                        }
+                    } else {
+                        // If no container found, click the button directly
+                        console.log(`Clicking standalone like button ${index + 1}`);
+                        button.click();
+                        likedCount++;
+                    }
+                } catch (error) {
+                    console.error(`Error processing like button ${index + 1}:`, error);
+                }
+            });
+            
+            // Click one button per container
+            containerButtonMap.forEach((button, container) => {
+                try {
+                    console.log(`Clicking like button in container`);
+                    button.click();
+                    likedCount++;
+                } catch (error) {
+                    console.error('Error clicking like button in container:', error);
+                }
+            });
+        }
+        
+        // Method 3: Ultimate fallback - click all heart/like icons
+        if (likedCount === 0) {
+            console.log('Still no likes, trying ultimate fallback');
+            
+            // Look for heart icons or other like indicators
+            const heartSelectors = [
+                '[aria-label*="like"]',
+                '[title*="like"]',
+                '[data-testid*="like"]',
+                '.fa-heart',
+                '.heart-icon',
+                'svg[class*="heart"]',
+                'button[class*="like"]'
+            ];
+            
+            for (const selector of heartSelectors) {
+                try {
+                    const elements = document.querySelectorAll(selector);
+                    console.log(`Found ${elements.length} elements with selector: ${selector}`);
+                    
+                    elements.forEach((element, index) => {
+                        try {
+                            if (element.offsetParent !== null) { // Check if visible
+                                console.log(`Clicking heart/like element ${index + 1} with selector ${selector}`);
+                                element.click();
+                                likedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Error clicking heart element ${index + 1}:`, error);
+                        }
+                    });
+                    
+                    if (likedCount > 0) break; // Stop if we found some likes
+                } catch (error) {
+                    console.error(`Error with selector ${selector}:`, error);
+                }
+            }
+        }
+        
+        console.log(`Bulk auto-like completed: ${likedCount} sound effects liked`);
+        return likedCount;
+        
+    } catch (error) {
+        console.error('Error in bulk auto-like:', error);
+        return 0;
+    }
+}
+
+// Auto-like settings management
+async function setAutoLikeSetting(enabled) {
+    try {
+        await chrome.storage.local.set({ 'autoLikeEnabled': enabled });
+        console.log(`Auto-like setting updated: ${enabled}`);
+    } catch (error) {
+        console.error('Error saving auto-like setting:', error);
+    }
+}
+
+async function getAutoLikeSetting() {
+    try {
+        const result = await chrome.storage.local.get(['autoLikeEnabled']);
+        return result.autoLikeEnabled || false;
+    } catch (error) {
+        console.error('Error getting auto-like setting:', error);
+        return false;
+    }
+}
+
+async function downloadSoundEffect(soundEffect, folderName, tabId) {
     try {
         let downloadUrl = soundEffect.downloadUrl;
         
@@ -865,17 +989,9 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
             }
         }
         
-        // Create filename based on folder structure capability
-        let filename;
-        if (useFolderStructure) {
-            filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
-        } else {
-            // Use folder name as prefix when folder structure doesn't work
-            const folderPrefix = folderName.replace(/\//g, '_').replace(/\\/g, '_');
-            filename = `${folderPrefix}_${safeTitle}_${soundEffect.id}.${extension}`;
-        }
+        const filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
         
-        console.log(`Download filename: ${filename} from ${downloadUrl}`);
+        console.log(`Downloading sound effect: ${filename} from ${downloadUrl}`);
         
         // Use Chrome's downloads API
         return new Promise((resolve, reject) => {
@@ -899,4 +1015,168 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
         throw error;
     }
 }
-//# sourceMappingURL=background.js.map
+
+// Function to extract audio URL from a Pixabay page (moved here for download-time use)
+async function extractAudioUrlFromPage(pageUrl) {
+    try {
+        console.log(`Extracting audio URL from: ${pageUrl}`);
+        
+        const response = await fetch(pageUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const html = await response.text();
+        
+        // Enhanced patterns to find audio URLs in Pixabay pages
+        const audioUrlPatterns = [
+            // JSON data patterns
+            /"preview":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /"audioURL":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /"downloadURL":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /"audio":\s*"([^"]*\/[^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            
+            // Direct URL patterns
+            /https:\/\/cdn\.pixabay\.com\/audio\/[^"'\s]*\.(?:mp3|wav|ogg)/gi,
+            /https:\/\/pixabay\.com\/[^"'\s]*\.(?:mp3|wav|ogg)/gi,
+            /https:\/\/[^"'\s]*pixabay[^"'\s]*\.(?:mp3|wav|ogg)/gi,
+            
+            // HTML attribute patterns
+            /data-audio[-_]?url=["']([^"']*\.(?:mp3|wav|ogg)[^"']*)["']/gi,
+            /src=["']([^"']*\.(?:mp3|wav|ogg)[^"']*)["']/gi,
+            
+            // General audio file patterns
+            /https:\/\/[^"'\s]*\.mp3/gi,
+            /https:\/\/[^"'\s]*\.wav/gi,
+            /https:\/\/[^"'\s]*\.ogg/gi
+        ];
+        
+        for (const pattern of audioUrlPatterns) {
+            pattern.lastIndex = 0; // Reset regex state
+            const matches = [...html.matchAll(pattern)];
+            
+            if (matches.length > 0) {
+                for (const match of matches) {
+                    let audioUrl = match[1] || match[0];
+                    
+                    // Clean up the URL
+                    audioUrl = audioUrl.replace(/\\"/g, '"').replace(/\\/g, '');
+                    
+                    // Ensure proper protocol
+                    if (audioUrl.startsWith('//')) {
+                        audioUrl = 'https:' + audioUrl;
+                    } else if (audioUrl.startsWith('/')) {
+                        audioUrl = 'https://pixabay.com' + audioUrl;
+                    }
+                    
+                    // Validate the URL looks like an audio file
+                    if (audioUrl.match(/\.(?:mp3|wav|ogg|aac|m4a|flac)(?:\?|$)/i)) {
+                        console.log(`Found potential audio URL: ${audioUrl}`);
+                        return audioUrl;
+                    }
+                }
+            }
+        }
+        
+        throw new Error('No audio URL found in page content');
+        
+    } catch (error) {
+        console.error(`Failed to extract audio URL from ${pageUrl}:`, error);
+        throw error;
+    }
+}
+
+function getFileExtensionFromUrl(url) {
+    if (!url) return 'mp3';
+    
+    try {
+        const urlObj = new URL(url);
+        const pathname = urlObj.pathname;
+        const extension = pathname.split('.').pop()?.toLowerCase();
+        
+        if (extension && ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(extension)) {
+            return extension;
+        }
+        
+        return 'mp3'; // Default for audio files
+    } catch {
+        return 'mp3';
+    }
+}
+
+function pauseDownload() {
+    isDownloadPaused = true;
+    updateExtensionState({
+        isPaused: true,
+        lastStatus: { icon: 'Pause', message: 'Download paused', type: 'warning' }
+    });
+    console.log('Download paused');
+    sendMessageToPopup({ action: 'DOWNLOAD_PAUSED' });
+}
+
+function resumeDownload() {
+    isDownloadPaused = false;
+    updateExtensionState({
+        isPaused: false,
+        lastStatus: { icon: 'Play', message: 'Download resumed', type: 'success' }
+    });
+    console.log('Download resumed');
+    sendMessageToPopup({ action: 'DOWNLOAD_RESUMED' });
+}
+
+function cancelDownload() {
+    isDownloadCanceled = true;
+    isDownloadPaused = false;
+    downloadQueue = [];
+    updateExtensionState({
+        isDownloading: false,
+        isPaused: false,
+        lastStatus: { icon: 'X', message: 'Download canceled', type: 'error' }
+    });
+    console.log('Download canceled');
+    sendMessageToPopup({ action: 'DOWNLOAD_CANCELED' });
+}
+
+function sanitizeFilename(filename) {
+    if (!filename) return 'unknown';
+    return filename
+        .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_')
+        .toLowerCase()
+        .substring(0, 50);
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function to send messages to popup safely
+async function sendMessageToPopup(message) {
+    try {
+        await chrome.runtime.sendMessage(message);
+    } catch (error) {
+        // Popup might be closed, which is normal - just log it
+        console.log('Could not send message to popup (popup may be closed):', message.action);
+    }
+}
+
+// Handle extension installation
+chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install') {
+        console.log('Pixabay Sound Effects Downloader installed');
+        chrome.storage.local.set({
+            'firstInstall': true,
+            'installDate': new Date().toISOString(),
+            'scrapingMode': 'sound-effects',
+            'autoLikeEnabled': false,
+            'version': '3.1'
+        });
+    }
+});

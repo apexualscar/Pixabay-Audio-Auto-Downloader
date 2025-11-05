@@ -1,4 +1,4 @@
-// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
+﻿// Background service worker for Pixabay Sound Effects Downloader - Focused Audio Extraction
 console.log('Pixabay Sound Effects Downloader background script loaded');
 
 // Download control variables
@@ -692,18 +692,12 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
         });
         
         // Create organized folder structure based on page info
-        let folderName = 'PixabayAudio';
+        let folderName = 'pixabay_sound_effects';
         if (pageInfo) {
-            // Create a cleaner folder structure that's more likely to work
-            const cleanTargetName = sanitizeFilename(pageInfo.targetName);
-            const pageStr = pageInfo.pageNumber > 1 ? `_Page${pageInfo.pageNumber}` : '';
-            folderName = `PixabayAudio/${cleanTargetName}${pageStr}`;
+            folderName = `pixabay_sound_effects/${pageInfo.targetName}-${pageInfo.targetID}/Page${pageInfo.pageNumber}_${pageInfo.elementRange}`;
         }
         
         console.log(`Using organized folder structure: ${folderName}`);
-        
-        // Test folder creation capability with first download
-        let folderWorking = true;
         
         for (let i = 0; i < soundEffects.length; i++) {
             // Check for cancel/pause
@@ -722,9 +716,7 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             const soundEffect = soundEffects[i];
             
             try {
-                // For first few downloads, test if folder structure works
-                const useFolderStructure = folderWorking && i < 3;
-                await downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure);
+                await downloadSoundEffect(soundEffect, folderName, tabId);
                 downloadedCount++;
                 
                 // Update progress and state
@@ -744,12 +736,6 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
                 
             } catch (error) {
                 console.error(`Failed to download ${soundEffect.id}:`, error);
-                
-                // If folder-related error and we're still testing, disable folder structure
-                if (folderWorking && (error.message.includes('path') || error.message.includes('folder') || error.message.includes('directory'))) {
-                    console.log('Folder structure failed, switching to flat file structure for remaining downloads');
-                    folderWorking = false;
-                }
                 // Continue with next file
             }
         }
@@ -792,111 +778,68 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
     }
 }
 
-async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure = true) {
+// Function to click ALL like buttons for ALL sound effects at once
+function clickAllLikeButtons() {
     try {
-        let downloadUrl = soundEffect.downloadUrl;
+        console.log('Starting bulk auto-like for ALL sound effects');
         
-        console.log(`Processing sound effect ${soundEffect.id} with URL: ${downloadUrl}`);
+        let likedCount = 0;
         
-        // Check if we have a direct audio file URL
-        const isDirectAudioUrl = downloadUrl && (
-            downloadUrl.includes('.mp3') || 
-            downloadUrl.includes('.wav') || 
-            downloadUrl.includes('.ogg') ||
-            downloadUrl.includes('.aac') ||
-            downloadUrl.includes('.m4a') ||
-            downloadUrl.includes('.flac')
-        );
+        // Method 1: Look for like buttons within likeButtonWrapper elements
+        const likeWrappers = document.querySelectorAll('.likeButtonWrapper--yrNJw');
+        console.log(`Found ${likeWrappers.length} like button wrappers`);
         
-        if (!isDirectAudioUrl) {
-            console.log(`No direct audio URL found, attempting to extract from page: ${downloadUrl}`);
-            
-            // Try to extract audio URL from the page - NOW during download time
-            if (soundEffect.pageUrl || downloadUrl) {
-                try {
-                    const pageUrl = soundEffect.pageUrl || downloadUrl;
-                    const extractedUrl = await extractAudioUrlFromPage(pageUrl);
-                    if (extractedUrl) {
-                        downloadUrl = extractedUrl;
-                        console.log(`Successfully extracted audio URL: ${downloadUrl}`);
-                    }
-                } catch (error) {
-                    console.log(`Failed to extract audio URL from page: ${error.message}`);
-                }
-            }
-            
-            // If still no direct audio URL, try preview URL as fallback
-            if (!isDirectAudioUrl && soundEffect.previewUrl) {
-                console.log(`Using preview URL as fallback: ${soundEffect.previewUrl}`);
-                downloadUrl = soundEffect.previewUrl;
-            }
-        }
-        
-        // Validate that we have a downloadable URL
-        if (!downloadUrl) {
-            throw new Error(`No downloadable URL found for ${soundEffect.id}`);
-        }
-        
-        // Create filename with proper extension detection
-        const safeTitle = sanitizeFilename(soundEffect.title || `sound_effect_${soundEffect.id}`);
-        let extension = getFileExtensionFromUrl(downloadUrl);
-        
-        // If extension detection fails, try to determine from content type
-        if (!extension || extension === 'mp3') {
+        likeWrappers.forEach((wrapper, index) => {
             try {
-                const response = await fetch(downloadUrl, { 
-                    method: 'HEAD',
-                    signal: AbortSignal.timeout(5000) // 5 second timeout
-                });
-                const contentType = response.headers.get('content-type');
-                if (contentType) {
-                    if (contentType.includes('audio/mpeg')) extension = 'mp3';
-                    else if (contentType.includes('audio/wav')) extension = 'wav';
-                    else if (contentType.includes('audio/ogg')) extension = 'ogg';
-                    else if (contentType.includes('audio/aac')) extension = 'aac';
-                    else if (contentType.includes('audio/mp4')) extension = 'm4a';
-                    else extension = 'mp3'; // Default fallback
+                // Find the like button within this wrapper
+                const likeButton = wrapper.querySelector('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+                if (likeButton) {
+                    console.log(`Clicking like button ${index + 1} in wrapper`);
+                    likeButton.click();
+                    likedCount++;
                 } else {
-                    extension = 'mp3'; // Default fallback
+                    console.log(`No like button found in wrapper ${index + 1}`);
                 }
             } catch (error) {
-                console.log(`Could not determine content type for ${downloadUrl}, using mp3`);
-                extension = 'mp3';
+                console.error(`Error clicking like button in wrapper ${index + 1}:`, error);
             }
-        }
+        });
         
-        // Create filename based on folder structure capability
-        let filename;
-        if (useFolderStructure) {
-            filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
-        } else {
-            // Use folder name as prefix when folder structure doesn't work
-            const folderPrefix = folderName.replace(/\//g, '_').replace(/\\/g, '_');
-            filename = `${folderPrefix}_${safeTitle}_${soundEffect.id}.${extension}`;
-        }
-        
-        console.log(`Download filename: ${filename} from ${downloadUrl}`);
-        
-        // Use Chrome's downloads API
-        return new Promise((resolve, reject) => {
-            chrome.downloads.download({
-                url: downloadUrl,
-                filename: filename,
-                saveAs: false,
-                conflictAction: 'uniquify'
-            }, (downloadId) => {
-                if (chrome.runtime.lastError) {
-                    console.error(`Download failed for ${filename}:`, chrome.runtime.lastError);
-                    reject(new Error(chrome.runtime.lastError.message));
-                } else {
-                    console.log(`Started download: ${downloadId} - ${filename}`);
-                    resolve(downloadId);
+        // Method 2: Fallback - find all like buttons and group by containers
+        if (likedCount === 0) {
+            console.log('No wrappers found, using fallback method');
+            
+            const allLikeButtons = document.querySelectorAll('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
+            console.log(`Found ${allLikeButtons.length} total like buttons on page`);
+            
+            // Group buttons by their parent containers to avoid duplicates
+            const containerButtonMap = new Map();
+            
+            allLikeButtons.forEach((button, index) => {
+                try {
+                    // Find the sound effect container
+                    const container = button.closest('.overlayContainer--0ZpHP, .audioRow--nAm4Z, .media-item, .item-container, [data-testid="media-item"], .likeButtonWrapper--yrNJw');
+                    
+                    if (container) {
+                        // Only store one button per container (to avoid clicking multiple buttons in same item)
+                        if (!containerButtonMap.has(container)) {
+                            containerButtonMap.set(container, button);
+                        }
+                    } else {
+                        // If no container found, click the button directly
+                        console.log(`Clicking standalone like button ${index + 1}`);
+                        button.click();
+                        likedCount++;
+                    }
+                } catch (error) {
+                    console.error(`Error processing like button ${index + 1}:`, error);
                 }
             });
-        });
-    } catch (error) {
-        console.error(`Error downloading sound effect ${soundEffect.id}:`, error);
-        throw error;
-    }
-}
-//# sourceMappingURL=background.js.map
+            
+            // Click one button per container
+            containerButtonMap.forEach((button, container) => {
+                try {
+                    console.log(`Clicking like button in container`);
+                    button.click();
+                    likedCount++;
+                } catch (error) {
