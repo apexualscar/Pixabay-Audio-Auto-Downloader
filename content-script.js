@@ -63,6 +63,13 @@ function addScrapingIndicators() {
 function handleBackgroundMessage(message, sender, sendResponse) {
     console.log('Content script received message:', message);
     
+    // Check if we're on a Cloudflare challenge page
+    if (isCloudflareChallengePage()) {
+        console.log('Cloudflare challenge detected, waiting for completion...');
+        sendResponse({ error: 'Cloudflare challenge detected. Please wait for the page to load completely and try again.' });
+        return;
+    }
+    
     switch (message.action) {
         case 'SCAN_SOUND_EFFECTS':
             scanSoundEffectsFromCurrentPage();
@@ -71,6 +78,43 @@ function handleBackgroundMessage(message, sender, sendResponse) {
             cancelCurrentScan();
             break;
     }
+}
+
+function isCloudflareChallengePage() {
+    // Check for common Cloudflare challenge indicators
+    const cloudflareIndicators = [
+        'Checking your browser before accessing',
+        'This process is automatic',
+        'DDoS protection by Cloudflare',
+        'cf-browser-verification',
+        'cf-checking-browser',
+        'cf-challenge-page'
+    ];
+    
+    const pageText = document.body ? document.body.textContent || '' : '';
+    const pageHTML = document.documentElement ? document.documentElement.innerHTML || '' : '';
+    
+    for (const indicator of cloudflareIndicators) {
+        if (pageText.includes(indicator) || pageHTML.includes(indicator)) {
+            return true;
+        }
+    }
+    
+    // Check for Cloudflare-specific elements
+    const cloudflareSelectors = [
+        '.cf-browser-verification',
+        '.cf-checking-browser',
+        '#cf-challenge-stage',
+        '.cf-challenge-page'
+    ];
+    
+    for (const selector of cloudflareSelectors) {
+        if (document.querySelector(selector)) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 function cancelCurrentScan() {
@@ -162,15 +206,15 @@ function waitForPageLoad() {
 }
 
 async function scrollToLoadAllOptimized(sessionId) {
-    console.log('Optimized scrolling to load all sound effects...');
+    console.log('Optimized scrolling to load all sound effects with anti-Cloudflare measures...');
     
     return new Promise((resolve, reject) => {
         let scrollCount = 0;
         let lastItemCount = 0;
         let stableCount = 0;
-        const maxScrolls = 15; // Reduced from 50 to 15
-        const scrollDelay = 300; // Reduced from 1000ms to 300ms
-        const maxTime = 20000; // 20 second timeout
+        const maxScrolls = 10; // Reduced from 15 to 10 for better performance
+        const scrollDelay = 800; // Increased from 300ms to 800ms to avoid Cloudflare
+        const maxTime = 30000; // 30 second timeout (reduced from 20s)
         const startTime = Date.now();
         
         function scrollStep() {
@@ -183,7 +227,7 @@ async function scrollToLoadAllOptimized(sessionId) {
             if (Date.now() - startTime > maxTime) {
                 console.log('Scrolling timeout reached');
                 window.scrollTo(0, 0);
-                setTimeout(resolve, 500);
+                setTimeout(resolve, 1000); // Increased delay
                 return;
             }
             
@@ -202,29 +246,136 @@ async function scrollToLoadAllOptimized(sessionId) {
                 showScrapingProgress(`Loading sound effects... Found ${currentItemCount} items`);
             }
             
-            // Stop if no new items for 2 consecutive scrolls (reduced from 3) or max scrolls reached
+            // Stop if no new items for 2 consecutive scrolls or max scrolls reached
             if (stableCount >= 2 || scrollCount >= maxScrolls) {
                 console.log(`Scrolling complete. Final count: ${currentItemCount} sound effects`);
                 window.scrollTo(0, 0); // Scroll back to top
-                setTimeout(resolve, 500); // Reduced from 2000ms
+                setTimeout(resolve, 1000); // Increased delay
                 return;
             }
             
-            // Scroll down with smaller increment for faster loading
-            window.scrollBy(0, 800); // Reduced from 1000px
+            // Scroll down with human-like behavior to avoid detection
+            const scrollAmount = 600 + Math.random() * 400; // Random 600-1000px
+            window.scrollBy(0, scrollAmount);
             scrollCount++;
             
-            setTimeout(scrollStep, scrollDelay);
+            // Add random additional delay occasionally to mimic human behavior
+            const extraDelay = Math.random() < 0.3 ? Math.random() * 1000 : 0;
+            const totalDelay = scrollDelay + extraDelay;
+            
+            setTimeout(scrollStep, totalDelay);
         }
         
-        scrollStep();
+        // Initial delay before starting to mimic human behavior
+        setTimeout(scrollStep, 1000);
     });
 }
 
 function countSoundEffectsOnCurrentPageFast() {
-    // Faster counting method using simpler selectors
-    const containers = document.querySelectorAll('.overlayContainer--0ZpHP, .audioRow--nAm4Z');
-    return containers.length;
+    // More specific audio-only counting
+    let audioCount = 0;
+    
+    // Method 1: Try to find audio-specific rows first
+    const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+    if (audioRows.length > 0) {
+        return audioRows.length;
+    }
+    
+    // Method 2: Filter overlay containers to only include audio content
+    const allContainers = document.querySelectorAll('.overlayContainer--0ZpHP');
+    allContainers.forEach(container => {
+        if (isAudioContainer(container)) {
+            audioCount++;
+        }
+    });
+    
+    return audioCount;
+}
+
+// Helper function to determine if a container represents audio content
+function isAudioContainer(container) {
+    // Check 1: Look for audio-specific indicators in the URL
+    const linkElement = container.querySelector('a');
+    if (linkElement && linkElement.href) {
+        // Audio URLs typically contain /music/ or /sound-effects/
+        if (linkElement.href.includes('/music/') || 
+            linkElement.href.includes('/sound-effects/') ||
+            linkElement.href.includes('/audio/')) {
+            return true;
+        }
+    }
+    
+    // Check 2: Look for audio-specific classes or attributes
+    const audioIndicators = [
+        '[class*="audio"]',
+        '[class*="sound"]',
+        '[class*="music"]',
+        '[data-type="audio"]',
+        '[data-category="audio"]',
+        '[data-category="music"]',
+        '[data-category="sound-effects"]'
+    ];
+    
+    for (const selector of audioIndicators) {
+        if (container.querySelector(selector) || container.matches(selector)) {
+            return true;
+        }
+    }
+    
+    // Check 3: Look for play button or audio controls
+    const audioControlSelectors = [
+        '.play-button',
+        '.audio-controls',
+        '[class*="play"]',
+        '.fa-play',
+        '.fa-volume',
+        'button[title*="play" i]',
+        'button[aria-label*="play" i]'
+    ];
+    
+    for (const selector of audioControlSelectors) {
+        if (container.querySelector(selector)) {
+            return true;
+        }
+    }
+    
+    // Check 4: Look for duration indicators (audio files often show duration)
+    const durationSelectors = [
+        '[class*="duration"]',
+        '[class*="time"]',
+        '.fa-clock'
+    ];
+    
+    for (const selector of durationSelectors) {
+        const element = container.querySelector(selector);
+        if (element) {
+            const text = element.textContent || '';
+            // Check if it looks like a duration (e.g., "2:30", "0:45")
+            if (/\d+:\d+/.test(text)) {
+                return true;
+            }
+        }
+    }
+    
+    // Check 5: Exclude obvious image indicators
+    const imageElement = container.querySelector('img');
+    if (imageElement) {
+        const src = imageElement.src || '';
+        const alt = imageElement.alt || '';
+        
+        // If the image clearly indicates it's a photo/illustration, exclude it
+        if (src.includes('/photo/') || 
+            src.includes('/illustration/') ||
+            src.includes('/vector/') ||
+            alt.toLowerCase().includes('photo') ||
+            alt.toLowerCase().includes('image') ||
+            alt.toLowerCase().includes('picture')) {
+            return false;
+        }
+    }
+    
+    // If none of the audio indicators are found, assume it's not audio
+    return false;
 }
 
 async function extractSoundEffectsOptimized(sessionId) {
@@ -233,24 +384,40 @@ async function extractSoundEffectsOptimized(sessionId) {
     
     const soundEffects = [];
     
-    // Use more efficient selector approach
-    const allContainers = document.querySelectorAll('.overlayContainer--0ZpHP, .audioRow--nAm4Z');
-    console.log(`Found ${allContainers.length} total containers`);
+    // Method 1: Try audio-specific selectors first
+    let audioContainers = document.querySelectorAll('.audioRow--nAm4Z');
     
-    if (allContainers.length === 0) {
-        // Try alternative selectors only if no primary ones found
+    // Method 2: If no audio rows found, filter overlay containers for audio content
+    if (audioContainers.length === 0) {
+        const allContainers = document.querySelectorAll('.overlayContainer--0ZpHP');
+        const filteredContainers = [];
+        
+        allContainers.forEach(container => {
+            if (isAudioContainer(container)) {
+                filteredContainers.push(container);
+            }
+        });
+        
+        audioContainers = filteredContainers;
+        console.log(`Filtered ${allContainers.length} containers down to ${audioContainers.length} audio containers`);
+    }
+    
+    if (audioContainers.length === 0) {
+        // Try alternative selectors only if no audio content found
         return await extractUsingFallbackSelectors(sessionId);
     }
     
+    console.log(`Found ${audioContainers.length} audio containers`);
+    
     // Process containers in batches to prevent blocking
     const batchSize = 10;
-    for (let i = 0; i < allContainers.length; i += batchSize) {
+    for (let i = 0; i < audioContainers.length; i += batchSize) {
         // Check for cancellation
         if (!scrapingInProgress || scrapingSessionId !== sessionId) {
             throw new Error('Scan cancelled');
         }
         
-        const batch = Array.from(allContainers).slice(i, i + batchSize);
+        const batch = Array.from(audioContainers).slice(i, i + batchSize);
         
         for (let j = 0; j < batch.length; j++) {
             const container = batch[j];
@@ -267,8 +434,8 @@ async function extractSoundEffectsOptimized(sessionId) {
         }
         
         // Update progress
-        const processed = Math.min(i + batchSize, allContainers.length);
-        showScrapingProgress(`Processed ${processed}/${allContainers.length} items...`);
+        const processed = Math.min(i + batchSize, audioContainers.length);
+        showScrapingProgress(`Processed ${processed}/${audioContainers.length} audio items...`);
         
         // Allow other processes to run
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -279,14 +446,21 @@ async function extractSoundEffectsOptimized(sessionId) {
 }
 
 async function extractUsingFallbackSelectors(sessionId) {
-    console.log('Using fallback selectors...');
+    console.log('Using fallback selectors for audio content...');
     
+    // More specific audio fallback selectors
     const alternativeSelectors = [
-        '[class*="overlayContainer"]',
         '[class*="audioRow"]',
         '[class*="audio-row"]',
+        '[class*="sound-row"]',
+        '[class*="music-row"]',
         '.audio-item',
-        '.sound-item'
+        '.sound-item',
+        '.music-item',
+        '[data-type="audio"]',
+        '[data-category="audio"]',
+        '[data-category="music"]',
+        '[data-category="sound-effects"]'
     ];
     
     for (const selector of alternativeSelectors) {
@@ -314,21 +488,70 @@ async function extractUsingFallbackSelectors(sessionId) {
         }
     }
     
-    return [];
+    // Final fallback: manually filter all overlay containers
+    console.log('Using manual filtering as final fallback...');
+    const allContainers = document.querySelectorAll('.overlayContainer--0ZpHP');
+    const audioContainers = [];
+    
+    for (let i = 0; i < allContainers.length && i < 100; i++) { // Limit for performance
+        if (isAudioContainer(allContainers[i])) {
+            audioContainers.push(allContainers[i]);
+        }
+    }
+    
+    console.log(`Manual filtering found ${audioContainers.length} audio containers from ${allContainers.length} total`);
+    
+    const soundEffects = [];
+    for (let i = 0; i < audioContainers.length; i++) {
+        try {
+            const soundEffect = await extractSoundEffectOptimized(audioContainers[i], i);
+            if (soundEffect) {
+                soundEffects.push(soundEffect);
+            }
+        } catch (error) {
+            console.error(`Error processing container ${i}:`, error);
+        }
+    }
+    
+    return soundEffects;
 }
 
 async function extractSoundEffectOptimized(container, index) {
     try {
+        // Validate this is actually audio content before processing
+        if (!isAudioContainer(container)) {
+            console.log(`Skipping non-audio container ${index}`);
+            return null;
+        }
+        
         // Basic extraction without expensive operations
         const linkElement = container.querySelector('a');
         let itemUrl = linkElement ? linkElement.href : '';
         let itemId = `sound_${index}`;
         
-        // Extract ID from URL if available
+        // Validate URL contains audio indicators
         if (itemUrl) {
-            const idMatch = itemUrl.match(/\/(\d+)/);
+            // Extract ID from URL if available (for individual sound effect pages)
+            const idMatch = itemUrl.match(/\/(\d+)(?:\/|$|\?)/);
             if (idMatch) {
                 itemId = idMatch[1];
+                console.log(`Extracted sound effect ID: ${itemId} from URL: ${itemUrl}`);
+            }
+            
+            // Check if this is an individual sound effect URL or just contains audio indicators
+            const isIndividualUrl = itemUrl.match(/\/music-\d+\/|\/sound-effect-\d+\/|\/audio-\d+\//);
+            const hasAudioIndicators = itemUrl.includes('/music/') || 
+                                     itemUrl.includes('/sound-effects/') || 
+                                     itemUrl.includes('/audio/');
+            
+            if (!isIndividualUrl && !hasAudioIndicators) {
+                // Additional check: if URL contains image indicators, skip
+                if (itemUrl.includes('/photo/') || 
+                    itemUrl.includes('/illustration/') || 
+                    itemUrl.includes('/vector/')) {
+                    console.log(`Skipping image URL: ${itemUrl}`);
+                    return null;
+                }
             }
         }
         
@@ -340,6 +563,16 @@ async function extractSoundEffectOptimized(container, index) {
         if (imgElement) {
             previewUrl = imgElement.src || imgElement.getAttribute('data-src') || '';
             title = imgElement.alt || imgElement.title || '';
+            
+            // Additional validation: check if image alt/title suggests it's not audio
+            if (title.toLowerCase().includes('photo') ||
+                title.toLowerCase().includes('image') ||
+                title.toLowerCase().includes('picture') ||
+                title.toLowerCase().includes('illustration') ||
+                title.toLowerCase().includes('vector')) {
+                console.log(`Skipping non-audio content based on title: ${title}`);
+                return null;
+            }
         }
         
         // Try to find title from text content (simplified)
@@ -360,17 +593,27 @@ async function extractSoundEffectOptimized(container, index) {
             title = `Sound Effect ${index + 1}`;
         }
         
-        // Don't fetch audio URLs during scanning - do it during download
-        // This dramatically improves performance
+        // Final validation: ensure we have a valid audio URL or page URL
+        if (!itemUrl) {
+            console.log(`Skipping container ${index} - no URL found`);
+            return null;
+        }
+        
+        // Store both the individual page URL and current profile page URL
+        const currentPageUrl = window.location.href;
+        
+        console.log(`Successfully extracted audio item ${index}: ${title} (Individual: ${itemUrl}, Profile: ${currentPageUrl})`);
         
         return {
             id: itemId,
             title: title.substring(0, 100), // Limit title length
-            downloadUrl: itemUrl, // Use page URL for now
+            downloadUrl: itemUrl, // Individual sound effect page URL
             previewUrl: previewUrl,
-            pageUrl: itemUrl,
+            pageUrl: itemUrl, // Individual page URL for button clicking
+            profileUrl: currentPageUrl, // Profile page URL as fallback
             category: 'sound-effects',
-            element: null // Don't store DOM elements to prevent memory leaks
+            element: null, // Don't store DOM elements to prevent memory leaks
+            useButtonClick: true // Flag to indicate we should use button clicking
         };
         
     } catch (error) {
@@ -479,7 +722,7 @@ function showScrapingProgress(message) {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(75, 194, 75, 0.95);
+            background: rgba(75,194,75,0.95);
             color: white;
             padding: 20px 30px;
             border-radius: 10px;
