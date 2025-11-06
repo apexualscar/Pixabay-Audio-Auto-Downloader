@@ -529,33 +529,56 @@ async function extractSoundEffectOptimized(container, index) {
         let itemUrl = linkElement ? linkElement.href : '';
         let itemId = `sound_${index}`;
         
-        // Validate URL contains audio indicators
+        // CRITICAL FIX: Ensure we get unique individual page URLs
         if (itemUrl) {
+            // Clean and validate URL first
+            try {
+                const url = new URL(itemUrl);
+                itemUrl = url.href; // Normalize the URL
+            } catch (error) {
+                console.log(`Invalid URL for item ${index}: ${itemUrl}`);
+                return null;
+            }
+            
             // Extract ID from URL if available (for individual sound effect pages)
             const idMatch = itemUrl.match(/\/(\d+)(?:\/|$|\?)/);
             if (idMatch) {
                 itemId = idMatch[1];
                 console.log(`Extracted sound effect ID: ${itemId} from URL: ${itemUrl}`);
+            } else {
+                // If no ID found in URL, generate a unique ID based on index and timestamp
+                itemId = `sound_${Date.now()}_${index}`;
+                console.log(`Generated unique ID: ${itemId} for URL: ${itemUrl}`);
             }
             
-            // Check if this is an individual sound effect URL or just contains audio indicators
-            const isIndividualUrl = itemUrl.match(/\/music-\d+\/|\/sound-effect-\d+\/|\/audio-\d+\//);
-            const hasAudioIndicators = itemUrl.includes('/music/') || 
-                                     itemUrl.includes('/sound-effects/') || 
-                                     itemUrl.includes('/audio/');
+            // IMPORTANT: Validate this is an individual sound effect page, not a profile page
+            const isIndividualPage = itemUrl.match(/\/music-\d+\/|\/sound-effect-\d+\/|\/audio-\d+\//) ||
+                                    (itemUrl.includes('/music/') && itemUrl.match(/\/\d+\//)) ||
+                                    (itemUrl.includes('/sound-effects/') && itemUrl.match(/\/\d+\//)) ||
+                                    (itemUrl.includes('/audio/') && itemUrl.match(/\/\d+\//));
             
-            if (!isIndividualUrl && !hasAudioIndicators) {
-                // Additional check: if URL contains image indicators, skip
-                if (itemUrl.includes('/photo/') || 
-                    itemUrl.includes('/illustration/') || 
-                    itemUrl.includes('/vector/')) {
-                    console.log(`Skipping image URL: ${itemUrl}`);
-                    return null;
+            if (!isIndividualPage) {
+                // If this is not an individual page, try to construct one from available data
+                const currentPageUrl = window.location.href;
+                if (currentPageUrl.includes('/users/') && idMatch) {
+                    // Try to construct individual page URL
+                    itemUrl = `https://pixabay.com/music/id-${idMatch[1]}/`;
+                    console.log(`Constructed individual page URL: ${itemUrl}`);
+                } else {
+                    console.log(`No individual page URL found for item ${index}, using: ${itemUrl}`);
                 }
+            }
+            
+            // Additional check: if URL contains image indicators, skip
+            if (itemUrl.includes('/photo/') || 
+                itemUrl.includes('/illustration/') || 
+                itemUrl.includes('/vector/')) {
+                console.log(`Skipping image URL: ${itemUrl}`);
+                return null;
             }
         }
         
-        // Get basic info
+        // Get basic info with better title extraction
         const imgElement = container.querySelector('img');
         let previewUrl = '';
         let title = '';
@@ -575,23 +598,42 @@ async function extractSoundEffectOptimized(container, index) {
             }
         }
         
-        // Try to find title from text content (simplified)
+        // Enhanced title extraction with multiple fallbacks
         if (!title && linkElement) {
             title = linkElement.textContent?.trim() || '';
         }
         
         if (!title) {
-            // Quick text search without deep traversal
-            const titleElement = container.querySelector('[class*="title"], [class*="name"], h3, h4');
-            if (titleElement) {
-                title = titleElement.textContent?.trim() || '';
+            // Try multiple selectors for title
+            const titleSelectors = [
+                '[class*="title"]',
+                '[class*="name"]', 
+                'h3', 
+                'h4',
+                '.caption',
+                '.description',
+                '[aria-label]'
+            ];
+            
+            for (const selector of titleSelectors) {
+                const titleElement = container.querySelector(selector);
+                if (titleElement) {
+                    const extractedTitle = titleElement.textContent?.trim() || titleElement.getAttribute('aria-label')?.trim();
+                    if (extractedTitle && extractedTitle.length > 1) {
+                        title = extractedTitle;
+                        break;
+                    }
+                }
             }
         }
         
-        // Generate fallback title
+        // Generate fallback title with unique identifier
         if (!title || title.length < 2) {
-            title = `Sound Effect ${index + 1}`;
+            title = `Sound Effect ${itemId}`;
         }
+        
+        // Clean title to make it more useful
+        title = title.replace(/\s+/g, ' ').trim().substring(0, 100);
         
         // Final validation: ensure we have a valid audio URL or page URL
         if (!itemUrl) {
@@ -602,18 +644,25 @@ async function extractSoundEffectOptimized(container, index) {
         // Store both the individual page URL and current profile page URL
         const currentPageUrl = window.location.href;
         
-        console.log(`Successfully extracted audio item ${index}: ${title} (Individual: ${itemUrl}, Profile: ${currentPageUrl})`);
+        console.log(`Successfully extracted audio item ${index}:`);
+        console.log(`  - ID: ${itemId}`);
+        console.log(`  - Title: ${title}`);
+        console.log(`  - Individual URL: ${itemUrl}`);
+        console.log(`  - Profile URL: ${currentPageUrl}`);
         
         return {
             id: itemId,
-            title: title.substring(0, 100), // Limit title length
+            title: title,
             downloadUrl: itemUrl, // Individual sound effect page URL
             previewUrl: previewUrl,
             pageUrl: itemUrl, // Individual page URL for button clicking
             profileUrl: currentPageUrl, // Profile page URL as fallback
             category: 'sound-effects',
             element: null, // Don't store DOM elements to prevent memory leaks
-            useButtonClick: true // Flag to indicate we should use button clicking
+            useButtonClick: true, // Flag to indicate we should use button clicking
+            // Add debug info
+            extractedAt: new Date().toISOString(),
+            containerIndex: index
         };
         
     } catch (error) {

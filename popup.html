@@ -27,12 +27,13 @@
         }
 
         body {
-            width: 420px;
-            height: 650px;
+            width: 450px;
+            height: 750px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--pixabay-gray-light);
             color: var(--pixabay-gray-dark);
             overflow-y: auto;
+            position: relative;
         }
 
         .container {
@@ -42,10 +43,43 @@
             flex-direction: column;
         }
 
+        /* Settings Cog Button - Top Right Corner */
+        .settings-cog {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px;
+            height: 28px;
+            background: var(--pixabay-gray);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            z-index: 1000;
+            box-shadow: var(--pixabay-shadow);
+        }
+
+        .settings-cog:hover {
+            background: var(--pixabay-gray-dark);
+            transform: rotate(90deg);
+            box-shadow: var(--pixabay-shadow-hover);
+        }
+
+        .settings-cog.active {
+            background: var(--pixabay-green);
+            transform: rotate(180deg);
+        }
+
         /* Title Section */
         .header {
             text-align: center;
             margin-bottom: 16px;
+            margin-top: 8px;
         }
 
         .header h1 {
@@ -73,6 +107,168 @@
             border-radius: 4px;
             font-size: 10px;
             font-weight: 600;
+        }
+
+        /* Configuration Section */
+        .config-section {
+            background: white;
+            border: 1px solid var(--pixabay-border);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: var(--pixabay-shadow);
+            position: relative;
+            opacity: 0;
+            max-height: 0;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .config-section.visible {
+            opacity: 1;
+            max-height: 400px;
+            transform: translateY(0);
+            overflow: visible;
+        }
+
+        .config-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--pixabay-gray-dark);
+            margin-bottom: 12px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .config-content {
+            display: block;
+            max-height: 280px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding-right: 4px;
+            margin-bottom: 12px;
+        }
+
+        /* Separate config buttons from content */
+        .config-buttons {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            border-top: 1px solid var(--pixabay-border);
+            padding-top: 12px;
+            margin-top: 0;
+        }
+
+        /* Custom scrollbar for config content */
+        .config-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .config-content::-webkit-scrollbar-track {
+            background: var(--pixabay-gray-light);
+            border-radius: 3px;
+        }
+
+        .config-content::-webkit-scrollbar-thumb {
+            background: var(--pixabay-gray);
+            border-radius: 3px;
+        }
+
+        .config-content::-webkit-scrollbar-thumb:hover {
+            background: var(--pixabay-gray-dark);
+        }
+
+        .config-group {
+            margin-bottom: 12px;
+        }
+
+        .config-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .config-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--pixabay-gray-dark);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .config-description {
+            font-size: 10px;
+            color: var(--pixabay-gray);
+            margin-bottom: 6px;
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--pixabay-border);
+            border-radius: 4px;
+            font-size: 11px;
+            transition: border-color 0.2s ease;
+        }
+
+        .config-input:focus {
+            outline: none;
+            border-color: var(--pixabay-green);
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--pixabay-border);
+            border-radius: 4px;
+            font-size: 11px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .config-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .config-checkbox {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .config-buttons {
+            display: flex;
+            gap: 6px;
+            margin-top: 12px;
+        }
+
+        .config-btn {
+            flex: 1;
+            padding: 6px 8px;
+            border: none;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .config-btn.primary {
+            background: var(--pixabay-green);
+            color: white;
+        }
+
+        .config-btn.primary:hover {
+            background: var(--pixabay-green-dark);
+        }
+
+        .config-btn.secondary {
+            background: var(--pixabay-gray);
+            color: white;
+        }
+
+        .config-btn.secondary:hover {
+            background: var(--pixabay-gray-dark);
         }
 
         /* Target Info Section - User Info */
@@ -412,7 +608,7 @@
             padding: 12px;
             margin-bottom: 12px;
             box-shadow: var(--pixabay-shadow);
-            max-height: 350px;
+            max-height: 250px;
             overflow-y: auto;
         }
 
@@ -607,6 +803,11 @@
 </head>
 
 <body>
+    <!-- Settings Cog Button - Top Right Corner -->
+    <button class="settings-cog" id="settingsCog" title="Settings">
+        ⚙️
+    </button>
+
     <div class="container">
         <!-- Title Section -->
         <div class="header">
@@ -617,6 +818,91 @@
         <div class="description">
             <strong>Focused Audio Scraper:</strong> Specifically designed to extract all sound effects from the current Pixabay page using advanced DOM selectors.
             <span class="mode-indicator">AUDIO SCRAPER</span>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="config-section" id="configSection">
+            <div class="config-title">⚙️ Download Settings</div>
+            <div class="config-content">
+                <!-- Download Location -->
+                <div class="config-group">
+                    <label class="config-label">Download Location</label>
+                    <div class="config-description">Choose where files should be downloaded</div>
+                    <select class="config-select" id="downloadLocation">
+                        <option value="downloads">Downloads Folder (Default)</option>
+                        <option value="desktop">Desktop</option>
+                        <option value="documents">Documents</option>
+                        <option value="music">Music Folder</option>
+                        <option value="custom">Custom Location</option>
+                    </select>
+                </div>
+
+                <!-- Custom Location Path -->
+                <div class="config-group hidden" id="customLocationGroup">
+                    <label class="config-label">Custom Path</label>
+                    <div class="config-description">Specify custom download directory</div>
+                    <input type="text" class="config-input" id="customLocationPath" placeholder="e.g., C:\Users\YourName\Music\Pixabay">
+                </div>
+
+                <!-- Main Folder Name -->
+                <div class="config-group">
+                    <label class="config-label">Main Folder Name</label>
+                    <div class="config-description">Name of the main folder where audio files are organized</div>
+                    <input type="text" class="config-input" id="mainFolderName" value="PixabayAudio" placeholder="PixabayAudio">
+                </div>
+
+                <!-- Sort into User Folders -->
+                <div class="config-group">
+                    <label class="config-label">Organize by User</label>
+                    <div class="config-description">Create separate folders for each user's content</div>
+                    <div class="config-checkbox-group">
+                        <input type="checkbox" class="config-checkbox" id="sortIntoUserFolders" checked>
+                        <label for="sortIntoUserFolders">Create user-specific subfolders</label>
+                    </div>
+                </div>
+
+                <!-- Advanced Options -->
+                <div class="config-group">
+                    <label class="config-label">File Naming</label>
+                    <div class="config-description">How to name downloaded audio files</div>
+                    <select class="config-select" id="fileNamingPattern">
+                        <option value="title_id">Title + ID (Default)</option>
+                        <option value="id_title">ID + Title</option>
+                        <option value="title_only">Title Only</option>
+                        <option value="id_only">ID Only</option>
+                        <option value="custom">Custom Pattern</option>
+                    </select>
+                </div>
+
+                <!-- Quality Preference -->
+                <div class="config-group">
+                    <label class="config-label">Audio Quality</label>
+                    <div class="config-description">Preferred audio quality when available</div>
+                    <select class="config-select" id="audioQuality">
+                        <option value="highest">Highest Available</option>
+                        <option value="medium">Medium Quality</option>
+                        <option value="preview">Preview Quality</option>
+                    </select>
+                </div>
+
+                <!-- Download Delay -->
+                <div class="config-group">
+                    <label class="config-label">Download Delay (seconds)</label>
+                    <div class="config-description">Delay between downloads to avoid rate limiting</div>
+                    <select class="config-select" id="downloadDelay">
+                        <option value="1">1 second (Fast)</option>
+                        <option value="2" selected>2 seconds (Balanced)</option>
+                        <option value="3">3 seconds (Conservative)</option>
+                        <option value="5">5 seconds (Very Safe)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Config buttons outside scrollable area -->
+            <div class="config-buttons">
+                <button class="config-btn primary" id="saveConfigBtn">Save Settings</button>
+                <button class="config-btn secondary" id="resetConfigBtn">Reset to Default</button>
+            </div>
         </div>
 
         <!-- Target Info Section (User Info when detected) -->

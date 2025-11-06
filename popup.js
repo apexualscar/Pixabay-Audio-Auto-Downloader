@@ -5,12 +5,16 @@ let isScanning = false;
 let isDownloading = false;
 let isPaused = false;
 let scannedItems = [];
+let downloadConfig = {}; // Store configuration
 
 // Initialize immediately when DOM is ready
 document.addEventListener('DOMContentLoaded', initializePopup);
 
 async function initializePopup() {
     try {
+        // Load configuration first
+        await loadConfiguration();
+        
         // Get persisted state first
         await restoreExtensionState();
         
@@ -29,6 +33,138 @@ async function initializePopup() {
     } catch (error) {
         console.error('Error initializing popup:', error);
         updateStatusMessage('X', 'Error loading extension', 'error');
+    }
+}
+
+// Configuration Management
+async function loadConfiguration() {
+    try {
+        const result = await chrome.storage.local.get([
+            'downloadLocation',
+            'customLocationPath',
+            'mainFolderName',
+            'sortIntoUserFolders',
+            'fileNamingPattern',
+            'audioQuality',
+            'downloadDelay'
+        ]);
+        
+        // Set default configuration
+        downloadConfig = {
+            downloadLocation: result.downloadLocation || 'downloads',
+            customLocationPath: result.customLocationPath || '',
+            mainFolderName: result.mainFolderName || 'PixabayAudio',
+            sortIntoUserFolders: result.sortIntoUserFolders !== undefined ? result.sortIntoUserFolders : true,
+            fileNamingPattern: result.fileNamingPattern || 'title_id',
+            audioQuality: result.audioQuality || 'highest',
+            downloadDelay: result.downloadDelay || 2
+        };
+        
+        // Update UI with loaded configuration
+        updateConfigurationUI();
+        
+        console.log('Configuration loaded:', downloadConfig);
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+        // Use default configuration
+        downloadConfig = {
+            downloadLocation: 'downloads',
+            customLocationPath: '',
+            mainFolderName: 'PixabayAudio',
+            sortIntoUserFolders: true,
+            fileNamingPattern: 'title_id',
+            audioQuality: 'highest',
+            downloadDelay: 2
+        };
+    }
+}
+
+function updateConfigurationUI() {
+    // Update form fields with loaded configuration
+    document.getElementById('downloadLocation').value = downloadConfig.downloadLocation;
+    document.getElementById('customLocationPath').value = downloadConfig.customLocationPath;
+    document.getElementById('mainFolderName').value = downloadConfig.mainFolderName;
+    document.getElementById('sortIntoUserFolders').checked = downloadConfig.sortIntoUserFolders;
+    document.getElementById('fileNamingPattern').value = downloadConfig.fileNamingPattern;
+    document.getElementById('audioQuality').value = downloadConfig.audioQuality;
+    document.getElementById('downloadDelay').value = downloadConfig.downloadDelay;
+    
+    // Show/hide custom location group based on selection
+    const customLocationGroup = document.getElementById('customLocationGroup');
+    if (downloadConfig.downloadLocation === 'custom') {
+        customLocationGroup.classList.remove('hidden');
+    } else {
+        customLocationGroup.classList.add('hidden');
+    }
+    
+    console.log('Configuration UI updated with loaded settings');
+}
+
+async function saveConfiguration() {
+    try {
+        // Get values from form
+        downloadConfig = {
+            downloadLocation: document.getElementById('downloadLocation').value,
+            customLocationPath: document.getElementById('customLocationPath').value,
+            mainFolderName: document.getElementById('mainFolderName').value.trim() || 'PixabayAudio',
+            sortIntoUserFolders: document.getElementById('sortIntoUserFolders').checked,
+            fileNamingPattern: document.getElementById('fileNamingPattern').value,
+            audioQuality: document.getElementById('audioQuality').value,
+            downloadDelay: parseInt(document.getElementById('downloadDelay').value)
+        };
+        
+        // Save to storage
+        await chrome.storage.local.set(downloadConfig);
+        
+        // Send configuration to background script
+        await chrome.runtime.sendMessage({
+            action: 'UPDATE_CONFIG',
+            config: downloadConfig
+        });
+        
+        // Show success message
+        updateStatusMessage('Check', 'Configuration saved successfully', 'success');
+        
+        console.log('Configuration saved:', downloadConfig);
+    } catch (error) {
+        console.error('Error saving configuration:', error);
+        updateStatusMessage('X', 'Error saving configuration', 'error');
+    }
+}
+
+function resetConfiguration() {
+    // Reset to default values
+    downloadConfig = {
+        downloadLocation: 'downloads',
+        customLocationPath: '',
+        mainFolderName: 'PixabayAudio',
+        sortIntoUserFolders: true,
+        fileNamingPattern: 'title_id',
+        audioQuality: 'highest',
+        downloadDelay: 2
+    };
+    
+    // Update UI
+    updateConfigurationUI();
+    
+    // Save the reset configuration
+    saveConfiguration();
+}
+
+function toggleConfigSection() {
+    const configSection = document.getElementById('configSection');
+    const settingsCog = document.getElementById('settingsCog');
+    
+    if (configSection.classList.contains('visible')) {
+        // Hide configuration
+        configSection.classList.remove('visible');
+        settingsCog.classList.remove('active');
+        console.log('Configuration panel hidden');
+    } else {
+        // Show configuration
+        configSection.classList.add('visible');
+        settingsCog.classList.add('active');
+        console.log('Configuration panel shown');
     }
 }
 
@@ -97,6 +233,21 @@ async function restoreExtensionState() {
 }
 
 function setupEventListeners() {
+    // Configuration event listeners - Updated for new cog button
+    document.getElementById('settingsCog').addEventListener('click', toggleConfigSection);
+    document.getElementById('saveConfigBtn').addEventListener('click', saveConfiguration);
+    document.getElementById('resetConfigBtn').addEventListener('click', resetConfiguration);
+    
+    // Handle download location change
+    document.getElementById('downloadLocation').addEventListener('change', (e) => {
+        const customLocationGroup = document.getElementById('customLocationGroup');
+        if (e.target.value === 'custom') {
+            customLocationGroup.classList.remove('hidden');
+        } else {
+            customLocationGroup.classList.add('hidden');
+        }
+    });
+    
     // Separate scan and download buttons
     document.getElementById('scanBtn').addEventListener('click', () => startSoundEffectsScan());
     document.getElementById('downloadBtn').addEventListener('click', () => startSoundEffectsDownload());
@@ -324,7 +475,8 @@ async function startSoundEffectsScan() {
         // Send message to background script to start scanning
         const response = await chrome.runtime.sendMessage({
             action: 'START_SOUND_EFFECTS_SCAN',
-            tabId: activeTab.id
+            tabId: activeTab.id,
+            config: downloadConfig // Include configuration
         });
         
         console.log('Background script response:', response);
@@ -375,7 +527,8 @@ async function startSoundEffectsDownload() {
         // Send message to background script to start download
         const response = await chrome.runtime.sendMessage({
             action: 'START_DOWNLOAD',
-            tabId: activeTab.id
+            tabId: activeTab.id,
+            config: downloadConfig // Include configuration
         });
         
         console.log('Download start response:', response);

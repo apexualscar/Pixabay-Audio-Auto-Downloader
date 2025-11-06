@@ -12,6 +12,17 @@ let scannedSoundEffects = []; // Store scanned items separately
 let currentScanSession = null;
 let isScanInProgress = false;
 
+// Configuration variables
+let downloadConfig = {
+    downloadLocation: 'downloads',
+    customLocationPath: '',
+    mainFolderName: 'PixabayAudio',
+    sortIntoUserFolders: true,
+    fileNamingPattern: 'title_id',
+    audioQuality: 'highest',
+    downloadDelay: 2
+};
+
 // Popup state persistence variables
 let extensionState = {
     isScanning: false,
@@ -28,6 +39,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.action) {
         case 'GET_EXTENSION_STATE':
             sendResponse({ state: extensionState });
+            break;
+        case 'UPDATE_CONFIG':
+            handleConfigUpdate(message.config);
+            sendResponse({ success: true });
             break;
         case 'START_SOUND_EFFECTS_SCAN':
             handleSoundEffectsScan(message, sender.tab?.id || null);
@@ -74,6 +89,117 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
 });
+
+// Handle extension installation
+chrome.runtime.onInstalled.addListener(async (details) => {
+    if (details.reason === 'install') {
+        console.log('Pixabay Sound Effects Downloader installed');
+        await chrome.storage.local.set({
+            'firstInstall': true,
+            'installDate': new Date().toISOString(),
+            'scrapingMode': 'sound-effects',
+            'autoLikeEnabled': false,
+            'version': '3.1',
+            // Set default configuration
+            'downloadLocation': 'downloads',
+            'customLocationPath': '',
+            'mainFolderName': 'PixabayAudio',
+            'sortIntoUserFolders': true,
+            'fileNamingPattern': 'title_id',
+            'audioQuality': 'highest',
+            'downloadDelay': 2
+        });
+    }
+    
+    // Load configuration after installation or update
+    await loadConfiguration();
+});
+
+// Load configuration on startup
+chrome.runtime.onStartup.addListener(async () => {
+    await loadConfiguration();
+});
+
+// Load configuration immediately when service worker starts
+(async () => {
+    await loadConfiguration();
+})();
+
+// Load configuration on startup
+async function loadConfiguration() {
+    try {
+        const result = await chrome.storage.local.get([
+            'downloadLocation',
+            'customLocationPath',
+            'mainFolderName',
+            'sortIntoUserFolders',
+            'fileNamingPattern',
+            'audioQuality',
+            'downloadDelay'
+        ]);
+        
+        downloadConfig = {
+            downloadLocation: result.downloadLocation || 'downloads',
+            customLocationPath: result.customLocationPath || '',
+            mainFolderName: result.mainFolderName || 'PixabayAudio',
+            sortIntoUserFolders: result.sortIntoUserFolders !== undefined ? result.sortIntoUserFolders : true,
+            fileNamingPattern: result.fileNamingPattern || 'title_id',
+            audioQuality: result.audioQuality || 'highest',
+            downloadDelay: result.downloadDelay || 2
+        };
+        
+        console.log('Configuration loaded:', downloadConfig);
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+    }
+}
+
+function handleConfigUpdate(config) {
+    downloadConfig = { ...downloadConfig, ...config };
+    console.log('Configuration updated:', downloadConfig);
+}
+
+function generateFilename(soundEffect, index) {
+    const title = sanitizeFilename(soundEffect.title || `sound_effect_${index}`);
+    const id = soundEffect.id || index;
+    
+    switch (downloadConfig.fileNamingPattern) {
+        case 'title_id':
+            return `${title}_${id}`;
+        case 'id_title':
+            return `${id}_${title}`;
+        case 'title_only':
+            return title;
+        case 'id_only':
+            return id.toString();
+        case 'custom':
+            // Could implement custom pattern in the future
+            return `${title}_${id}`;
+        default:
+            return `${title}_${id}`;
+    }
+}
+
+function getFolderPath(pageInfo) {
+    let folderPath = downloadConfig.mainFolderName;
+    
+    if (downloadConfig.sortIntoUserFolders && pageInfo) {
+        const cleanTargetName = sanitizeFilename(pageInfo.targetName);
+        const pageStr = pageInfo.pageNumber > 1 ? `_Page${pageInfo.pageNumber}` : '';
+        
+        if (downloadConfig.downloadLocation === 'custom' && downloadConfig.customLocationPath) {
+            folderPath = `${downloadConfig.customLocationPath}/${downloadConfig.mainFolderName}/${cleanTargetName}${pageStr}`;
+        } else {
+            folderPath = `${downloadConfig.mainFolderName}/${cleanTargetName}${pageStr}`;
+        }
+    } else {
+        if (downloadConfig.downloadLocation === 'custom' && downloadConfig.customLocationPath) {
+            folderPath = `${downloadConfig.customLocationPath}/${downloadConfig.mainFolderName}`;
+        }
+    }
+    
+    return folderPath;
+}
 
 // Listen for tab changes and close events to cancel scans
 chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -733,20 +859,15 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             count: totalCount
         });
         
-        // Create organized folder structure based on page info
-        let folderName = 'PixabayAudio';
-        if (pageInfo) {
-            // Create a cleaner folder structure that's more likely to work
-            const cleanTargetName = sanitizeFilename(pageInfo.targetName);
-            const pageStr = pageInfo.pageNumber > 1 ? `_Page${pageInfo.pageNumber}` : '';
-            folderName = `PixabayAudio/${cleanTargetName}${pageStr}`;
-        }
+        // Create organized folder structure based on page info and configuration
+        let folderName = getFolderPath(pageInfo);
         
-        console.log(`Using organized folder structure: ${folderName}`);
-        console.log('Note: Using Chrome Downloads API with folder structure support');
+        console.log(`Using configured folder structure: ${folderName}`);
+        console.log('Configuration applied:', downloadConfig);
         
-        // Test folder creation capability with first download
+        // Enhanced folder creation testing
         let folderWorking = true;
+        let folderTestResult = null;
         
         for (let i = 0; i < soundEffects.length; i++) {
             // Check for cancel/pause
@@ -765,12 +886,12 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             const soundEffect = soundEffects[i];
             
             try {
-                // Add anti-Cloudflare delays between downloads
-                const baseDelay = 1000; // Base 1 second delay
-                const randomDelay = Math.random() * 2000; // Random 0-2 seconds
-                const totalDelay = baseDelay + randomDelay;
+                // Apply configured download delay
+                const configuredDelay = downloadConfig.downloadDelay * 1000; // Convert to milliseconds
+                const randomDelay = Math.random() * 1000; // Random 0-1 seconds
+                const totalDelay = configuredDelay + randomDelay;
                 
-                console.log(`Waiting ${Math.round(totalDelay)}ms before downloading ${soundEffect.id} (anti-Cloudflare measure)`);
+                console.log(`Waiting ${Math.round(totalDelay)}ms before downloading ${soundEffect.id} (configured delay: ${downloadConfig.downloadDelay}s)`);
                 await sleep(totalDelay);
                 
                 // Update status to show which file is being processed
@@ -778,16 +899,34 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
                     lastStatus: { icon: 'Download', message: `Downloading ${i + 1}/${totalCount}: ${soundEffect.title}`, type: 'success' }
                 });
                 
-                // For first download, test if folder structure works
-                const useFolderStructure = folderWorking;
-                const result = await downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure);
+                // Test folder structure on first download, then use result for all subsequent downloads
+                let useFolderStructure = folderWorking;
+                if (i === 0) {
+                    // First download - test folder capability
+                    console.log('Testing folder creation capability with first download...');
+                    useFolderStructure = true;
+                } else if (folderTestResult === 'FOLDER_STRUCTURE_FAILED') {
+                    // Use the result from first download
+                    useFolderStructure = false;
+                    console.log(`Using flat structure based on first download test result`);
+                }
                 
-                // If the result indicates folder structure failed, disable it for remaining downloads
-                if (result === 'FOLDER_STRUCTURE_FAILED') {
-                    console.log('Folder structure failed, switching to flat file structure for remaining downloads');
-                    folderWorking = false;
-                    downloadedCount++; // Still count as a successful download
-                } else if (result === 'NATIVE_DOWNLOAD_TRIGGERED' || result === 'OPENED_IN_NEW_TAB') {
+                const result = await downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure, i);
+                
+                // Store the result from first download to apply to all subsequent downloads
+                if (i === 0) {
+                    folderTestResult = result;
+                    if (result === 'FOLDER_STRUCTURE_FAILED') {
+                        console.log('First download test failed - folder structure not supported. Using flat structure for remaining downloads.');
+                        folderWorking = false;
+                    } else {
+                        console.log('First download test successful - folder structure supported. Using folders for remaining downloads.');
+                        folderWorking = true;
+                    }
+                }
+                
+                // Count as successful download regardless of folder structure
+                if (result === 'FOLDER_STRUCTURE_FAILED' || result === 'NATIVE_DOWNLOAD_TRIGGERED' || result === 'OPENED_IN_NEW_TAB' || typeof result === 'number') {
                     downloadedCount++;
                 }
                 
@@ -806,20 +945,25 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
             } catch (error) {
                 console.error(`Failed to download ${soundEffect.id}:`, error);
                 
-                // If folder-related error and we're still testing, disable folder structure
-                if (folderWorking && (error.message.includes('path') || error.message.includes('folder') || error.message.includes('directory'))) {
-                    console.log('Folder structure failed based on error, switching to flat file structure for remaining downloads');
+                // If this is the first download and it's a folder-related error, disable folder structure
+                if (i === 0 && (error.message.includes('path') || error.message.includes('folder') || error.message.includes('directory'))) {
+                    console.log('First download failed due to folder issues - disabling folder structure for all downloads');
                     folderWorking = false;
+                    folderTestResult = 'FOLDER_STRUCTURE_FAILED';
                     
                     // Retry this download with flat structure
                     try {
-                        await downloadSoundEffect(soundEffect, folderName, tabId, false);
-                        downloadedCount++;
+                        console.log(`Retrying first download with flat structure...`);
+                        await sleep(1000); // Brief delay before retry
+                        const retryResult = await downloadSoundEffect(soundEffect, folderName, tabId, false, i);
+                        if (retryResult) {
+                            downloadedCount++;
+                        }
                     } catch (retryError) {
                         console.error(`Retry also failed for ${soundEffect.id}:`, retryError);
                     }
                 } else {
-                    // Continue with next file for non-folder related errors
+                    // For subsequent downloads or non-folder errors, just continue
                     console.log(`Skipping ${soundEffect.id} due to error, continuing with next file`);
                 }
             }
@@ -863,6 +1007,156 @@ async function startSoundEffectsDownload(soundEffects, tabId) {
     }
 }
 
+// New function to handle directory creation and downloads
+async function downloadWithDirectoryStructure(url, folderPath, filename, useFolderStructure) {
+    if (!useFolderStructure) {
+        // Use flat structure immediately
+        const flatFilename = `${folderPath.replace(/\//g, '_')}_${filename}`;
+        return await chromeDownloadFile(url, flatFilename);
+    }
+    
+    // Note: File System Access API is not available in service worker context
+    // Service workers don't have access to DOM APIs like showDirectoryPicker
+    console.log('File System Access API not available in service worker context');
+    
+    // Try Chrome Downloads API with directory hints
+    try {
+        console.log('Attempting Chrome Downloads API with directory structure');
+        
+        // Handle different download locations
+        let fullPath;
+        const baseLocation = downloadConfig.downloadLocation;
+        
+        switch (baseLocation) {
+            case 'desktop':
+                fullPath = `Desktop/${folderPath}/${filename}`;
+                break;
+            case 'documents':
+                fullPath = `Documents/${folderPath}/${filename}`;
+                break;
+            case 'music':
+                fullPath = `Music/${folderPath}/${filename}`;
+                break;
+            case 'custom':
+                if (downloadConfig.customLocationPath) {
+                    // Use custom path directly since folderPath already includes it
+                    fullPath = `${folderPath}/${filename}`;
+                } else {
+                    // Fallback to downloads if custom path is empty
+                    fullPath = `${folderPath}/${filename}`;
+                }
+                break;
+            case 'downloads':
+            default:
+                // Use forward slashes for cross-platform compatibility
+                const directoryPath = folderPath.replace(/\\/g, '/');
+                fullPath = `${directoryPath}/${filename}`;
+                break;
+        }
+        
+        console.log(`Attempting download to: ${fullPath}`);
+        return await chromeDownloadFile(url, fullPath);
+        
+    } catch (error) {
+        console.log('Chrome Downloads API with folders failed:', error.message);
+        
+        // Fallback to Downloads folder only
+        console.log('Falling back to Downloads folder without subdirectories');
+        return await chromeDownloadFile(url, filename);
+    }
+}
+
+// Enhanced Chrome Downloads API function
+async function chromeDownloadFile(url, filename) {
+    return new Promise((resolve, reject) => {
+        console.log(`Chrome Downloads API: Downloading "${filename}" from ${url}`);
+        
+        // Validate URL before attempting download
+        if (!url || !url.startsWith('http')) {
+            reject(new Error(`Invalid download URL: ${url}`));
+            return;
+        }
+        
+        // Validate filename
+        if (!filename) {
+            filename = `download_${Date.now()}.mp3`;
+        }
+        
+        // CRITICAL FIX: Ensure proper path handling for different operating systems
+        let processedFilename = filename;
+        
+        // Handle folder structure more explicitly
+        if (filename.includes('/')) {
+            // Split the path and ensure each part is valid
+            const pathParts = filename.split('/');
+            const validParts = pathParts.map((part, index) => {
+                // ? FIXED: Don't replace dots in the filename part (last part)
+                const isLastPart = index === pathParts.length - 1;
+                if (isLastPart) {
+                    // For the filename part, only sanitize dangerous characters but preserve the file extension dot
+                    return part.replace(/[<>:"|?*]/g, '_').trim();
+                } else {
+                    // For folder path parts, replace dots with underscores as before
+                    return part.replace(/[<>:"|?*]/g, '_').replace(/\./g, '_').trim();
+                }
+            }).filter(part => part.length > 0);
+            
+            if (validParts.length > 1) {
+                processedFilename = validParts.join('/');
+                console.log(`Processed folder path: ${processedFilename}`);
+            } else {
+                processedFilename = validParts[0] || `download_${Date.now()}.mp3`;
+                console.log(`Flattened to single filename: ${processedFilename}`);
+            }
+        }
+        
+        chrome.downloads.download({
+            url: url,
+            filename: processedFilename,
+            saveAs: false,
+            conflictAction: 'uniquify'
+        }, (downloadId) => {
+            if (chrome.runtime.lastError) {
+                const errorMessage = chrome.runtime.lastError.message;
+                console.error(`Download failed for ${processedFilename}:`, errorMessage);
+                
+                // If this was a folder-related error, try with flattened structure
+                if (errorMessage.toLowerCase().includes('path') || 
+                    errorMessage.toLowerCase().includes('directory') || 
+                    errorMessage.toLowerCase().includes('folder') ||
+                    errorMessage.toLowerCase().includes('invalid filename') ||
+                    errorMessage.toLowerCase().includes('file name') ||
+                    processedFilename.includes('/')) {
+                    
+                    // Create a flattened filename that includes folder info
+                    const flatFilename = processedFilename.replace(/\//g, '_');
+                    console.log(`Retrying download with flattened filename: ${flatFilename}`);
+                    
+                    chrome.downloads.download({
+                        url: url,
+                        filename: flatFilename,
+                        saveAs: false,
+                        conflictAction: 'uniquify'
+                    }, (retryDownloadId) => {
+                        if (chrome.runtime.lastError) {
+                            console.error(`Retry also failed:`, chrome.runtime.lastError.message);
+                            reject(new Error(chrome.runtime.lastError.message));
+                        } else {
+                            console.log(`Retry successful with flat structure: ${retryDownloadId} - ${flatFilename}`);
+                            resolve('FOLDER_STRUCTURE_FAILED');
+                        }
+                    });
+                } else {
+                    reject(new Error(errorMessage));
+                }
+            } else {
+                console.log(`Download started successfully: ${downloadId} - ${processedFilename}`);
+                resolve(downloadId);
+            }
+        });
+    });
+}
+
 // Function to click ALL like buttons for ALL sound effects at once
 function clickAllLikeButtons() {
     try {
@@ -880,7 +1174,7 @@ function clickAllLikeButtons() {
                 const likeButton = wrapper.querySelector('.button--9NFL8.square--n2VLb.light--C3NP-.center--ZZf40');
                 if (likeButton) {
                     console.log(`Clicking like button ${index + 1} in wrapper`);
-                    likeButton.click();
+//                   likeButton.click();
                     likedCount++;
                 } else {
                     console.log(`No like button found in wrapper ${index + 1}`);
@@ -955,117 +1249,122 @@ function clickAllLikeButtons() {
                     
                     elements.forEach((element, index) => {
                         try {
-                            if (element.offsetParent !== null) { // Check if visible
-                                console.log(`Clicking heart/like element ${index + 1} with selector ${selector}`);
+                            // Check if the element is visible
+                            const rect = element.getBoundingClientRect();
+                            const style = window.getComputedStyle(element);
+                            
+                            const isVisible = (
+                                rect.width > 0 && 
+                                rect.height > 0 &&
+                                style.display !== 'none' &&
+                                style.visibility !== 'hidden' &&
+                                style.opacity !== '0'
+                            );
+                            
+                            if (isVisible) {
+                                console.log(`Clicking visible like/heart icon ${index + 1}`);
                                 element.click();
                                 likedCount++;
+                            } else {
+                                console.log(`Like/heart icon ${index + 1} is not visible`);
                             }
                         } catch (error) {
-                            console.error(`Error clicking heart element ${index + 1}:`, error);
+                            console.error(`Error clicking like/heart icon ${index + 1}:`, error);
                         }
                     });
-                    
-                    if (likedCount > 0) break; // Stop if we found some likes
                 } catch (error) {
-                    console.error(`Error with selector ${selector}:`, error);
+                    console.error(`Error processing selector ${selector}:`, error);
                 }
             }
         }
         
-        console.log(`Bulk auto-like completed: ${likedCount} sound effects liked`);
-        return likedCount;
-        
+        console.log(`Bulk auto-like completed. Total liked: ${likedCount}`);
     } catch (error) {
-        console.error('Error in bulk auto-like:', error);
-        return 0;
+        console.error('Error in bulk auto-like function:', error);
     }
 }
 
-// Auto-like settings management
-async function setAutoLikeSetting(enabled) {
+async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure = true, index = 0) {
     try {
-        await chrome.storage.local.set({ 'autoLikeEnabled': enabled });
-        console.log(`Auto-like setting updated: ${enabled}`);
-    } catch (error) {
-        console.error('Error saving auto-like setting:', error);
-    }
-}
-
-async function getAutoLikeSetting() {
-    try {
-        const result = await chrome.storage.local.get(['autoLikeEnabled']);
-        return result.autoLikeEnabled || false;
-    } catch (error) {
-        console.error('Error getting auto-like setting:', error);
-        return false;
-    }
-}
-
-async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStructure = true) {
-    try {
-        console.log(`Processing sound effect ${soundEffect.id}:`);
+        console.log(`Processing sound effect ${soundEffect.id} (index ${index}):`);
         console.log(`- Individual URL: ${soundEffect.pageUrl || soundEffect.downloadUrl}`);
         console.log(`- Profile URL: ${soundEffect.profileUrl || 'N/A'}`);
+        console.log(`- Title: ${soundEffect.title}`);
         
-        // Method 1: Try to click the download button directly on the individual page (PREFERRED)
+        // Validate that we have unique data for this sound effect
+        if (!soundEffect.id || soundEffect.id === 'sound_0' || soundEffect.id.startsWith('sound_') && soundEffect.id.length < 10) {
+            console.log(`Warning: Sound effect has generic ID: ${soundEffect.id}, using index-based ID`);
+            soundEffect.id = `sound_${Date.now()}_${index}`;
+        }
+        
+        // Method 1: Try to navigate to individual page and click download button (PREFERRED)
         const individualPageUrl = soundEffect.pageUrl || soundEffect.downloadUrl;
         
-        if (individualPageUrl) {
+        if (individualPageUrl && individualPageUrl !== soundEffect.profileUrl) {
             // Check if this looks like an individual sound effect page
             const isIndividualPage = individualPageUrl.match(/\/music-\d+\/|\/sound-effect-\d+\/|\/audio-\d+\//) ||
-                                   individualPageUrl.includes('/music/') || 
-                                   individualPageUrl.includes('/sound-effects/') || 
-                                   individualPageUrl.includes('/audio/');
+                                   (individualPageUrl.includes('/music/') && individualPageUrl.match(/\/\d+/)) ||
+                                   (individualPageUrl.includes('/sound-effects/') && individualPageUrl.match(/\/\d+/)) ||
+                                   (individualPageUrl.includes('/audio/') && individualPageUrl.match(/\/\d+/));
             
             if (isIndividualPage) {
-                console.log(`Attempting to simulate download button click on individual page: ${individualPageUrl}`);
+                console.log(`Attempting to navigate to individual page and click download: ${individualPageUrl}`);
                 
                 try {
-                    const result = await simulateDownloadButtonClick(individualPageUrl, soundEffect.id, tabId);
+                    // Open individual page in the same tab
+                    await chrome.tabs.update(tabId, { url: individualPageUrl });
                     
-                    if (result && result.includes('SUCCESS')) {
-                        console.log(`Successfully triggered download via button click for ${soundEffect.id}`);
-                        return 'NATIVE_DOWNLOAD_TRIGGERED';
+                    // Wait for navigation to complete
+                    await sleep(3000);
+                    
+                    // Now try to click the download button
+                    const result = await chrome.scripting.executeScript({
+                        target: { tabId: tabId },
+                        function: clickDownloadButtonOnPage,
+                        args: [individualPageUrl, soundEffect.id]
+                    });
+                    
+                    if (result && result[0] && result[0].result) {
+                        const clickResult = result[0].result;
+                        console.log(`Button click result: ${clickResult}`);
+                        
+                        if (clickResult.includes('SUCCESS')) {
+                            console.log(`Successfully triggered download via navigation and button click for ${soundEffect.id}`);
+                            
+                            // Wait a bit for download to start, then navigate back
+                            await sleep(2000);
+                            
+                            // Navigate back to profile page for next download
+                            if (soundEffect.profileUrl) {
+                                await chrome.tabs.update(tabId, { url: soundEffect.profileUrl });
+                                await sleep(2000); // Wait for navigation back
+                            }
+                            
+                            return 'NATIVE_DOWNLOAD_TRIGGERED';
+                        }
                     }
                 } catch (error) {
-                    console.log(`Individual page button click failed for ${soundEffect.id}: ${error.message}`);
+                    console.log(`Navigation and button click failed for ${soundEffect.id}: ${error.message}`);
+                    
+                    // Navigate back to profile page on error
+                    if (soundEffect.profileUrl) {
+                        try {
+                            await chrome.tabs.update(tabId, { url: soundEffect.profileUrl });
+                            await sleep(2000);
+                        } catch (navError) {
+                            console.log(`Error navigating back to profile: ${navError.message}`);
+                        }
+                    }
                 }
             } else {
-                console.log(`URL appears to be a profile page, will try profile page approach: ${individualPageUrl}`);
-                
-                try {
-                    const result = await simulateDownloadButtonClick(individualPageUrl, soundEffect.id, tabId);
-                    
-                    if (result && result.includes('SUCCESS')) {
-                        console.log(`Successfully triggered download via profile page approach for ${soundEffect.id}`);
-                        return 'NATIVE_DOWNLOAD_TRIGGERED';
-                    }
-                } catch (error) {
-                    console.log(`Profile page button click failed for ${soundEffect.id}: ${error.message}`);
-                }
+                console.log(`URL does not appear to be an individual page: ${individualPageUrl}`);
             }
         }
         
-        // Method 2: Try using the profile URL if individual page failed
-        if (soundEffect.profileUrl && soundEffect.profileUrl !== individualPageUrl) {
-            console.log(`Trying profile URL approach: ${soundEffect.profileUrl}`);
-            
-            try {
-                const result = await simulateDownloadButtonClick(soundEffect.profileUrl, soundEffect.id, tabId);
-                
-                if (result && result.includes('SUCCESS')) {
-                    console.log(`Successfully triggered download via profile URL for ${soundEffect.id}`);
-                    return 'NATIVE_DOWNLOAD_TRIGGERED';
-                }
-            } catch (error) {
-                console.log(`Profile URL button click failed for ${soundEffect.id}: ${error.message}`);
-            }
-        }
+        console.log(`Button clicking method failed for ${soundEffect.id}, falling back to Chrome Downloads API...`);
         
-        console.log(`All button clicking methods failed for ${soundEffect.id}, falling back to Chrome Downloads API...`);
-        
-        // Method 3: Use Chrome Downloads API with proper folder structure
-        let downloadUrl = soundEffect.downloadUrl;
+        // Method 2: Use Chrome Downloads API with URL extraction
+        let downloadUrl = soundEffect.downloadUrl || soundEffect.pageUrl;
         
         // Check if we have a direct audio file URL
         const isDirectAudioUrl = downloadUrl && (
@@ -1078,32 +1377,30 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
         );
         
         // If we don't have a direct audio URL, try to extract from page
-        if (!isDirectAudioUrl) {
+        if (!isDirectAudioUrl && individualPageUrl) {
             console.log(`No direct audio URL found, attempting to extract from page: ${individualPageUrl}`);
             
-            if (individualPageUrl) {
-                try {
-                    const extractedUrl = await extractAudioUrlFromPage(individualPageUrl);
-                    if (extractedUrl && extractedUrl !== 'BUTTON_CLICKED') {
-                        downloadUrl = extractedUrl;
-                        console.log(`Successfully extracted audio URL: ${downloadUrl}`);
-                    } else if (extractedUrl === 'BUTTON_CLICKED') {
-                        console.log(`Download was triggered by button click during URL extraction, no further action needed`);
-                        return 'NATIVE_DOWNLOAD_TRIGGERED';
-                    }
-                } catch (error) {
-                    console.log(`Failed to extract audio URL from page: ${error.message}`);
+            try {
+                const extractedUrl = await extractAudioUrlFromPage(individualPageUrl);
+                if (extractedUrl && extractedUrl !== 'BUTTON_CLICKED') {
+                    downloadUrl = extractedUrl;
+                    console.log(`Successfully extracted audio URL: ${downloadUrl}`);
+                } else if (extractedUrl === 'BUTTON_CLICKED') {
+                    console.log(`Download was triggered by button click during URL extraction, no further action needed`);
+                    return 'NATIVE_DOWNLOAD_TRIGGERED';
                 }
+            } catch (error) {
+                console.log(`Failed to extract audio URL from page: ${error.message}`);
             }
-            
-            // If still no direct audio URL, try preview URL as fallback
-            if (!downloadUrl || !downloadUrl.match(/\.(?:mp3|wav|ogg|aac|m4a|flac)(?:\?|$)/i)) {
-                if (soundEffect.previewUrl) {
-                    console.log(`Using preview URL as final fallback: ${soundEffect.previewUrl}`);
-                    downloadUrl = soundEffect.previewUrl;
-                } else {
-                    throw new Error(`No downloadable URL found for ${soundEffect.id} after trying all methods`);
-                }
+        }
+        
+        // If still no direct audio URL, try preview URL as fallback
+        if (!downloadUrl || !downloadUrl.match(/\.(?:mp3|wav|ogg|aac|m4a|flac)(?:\?|$)/i)) {
+            if (soundEffect.previewUrl) {
+                console.log(`Using preview URL as fallback: ${soundEffect.previewUrl}`);
+                downloadUrl = soundEffect.previewUrl;
+            } else {
+                throw new Error(`No downloadable URL found for ${soundEffect.id} after trying all methods`);
             }
         }
         
@@ -1121,8 +1418,8 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
         
         console.log(`Using Chrome downloads API for ${soundEffect.id} with URL: ${downloadUrl}`);
         
-        // Create filename with proper extension detection
-        const safeTitle = sanitizeFilename(soundEffect.title || `sound_effect_${soundEffect.id}`);
+        // Create filename with configured pattern and proper extension detection
+        const baseFilename = generateFilename(soundEffect, index);
         let extension = getFileExtensionFromUrl(downloadUrl);
         
         // If extension detection fails, try to determine from content type
@@ -1150,66 +1447,11 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
             }
         }
         
-        // Create filename based on folder structure capability
-        let filename;
-        if (useFolderStructure) {
-            filename = `${folderName}/${safeTitle}_${soundEffect.id}.${extension}`;
-        } else {
-            // Use folder name as prefix when folder structure doesn't work
-            const folderPrefix = folderName.replace(/\//g, '_').replace(/\\/g, '_');
-            filename = `${folderPrefix}_${safeTitle}_${soundEffect.id}.${extension}`;
-        }
+        const fullFilename = `${baseFilename}.${extension}`;
+        console.log(`Generated filename: ${fullFilename} using pattern: ${downloadConfig.fileNamingPattern}`);
         
-        console.log(`Chrome Downloads API: ${filename} from ${downloadUrl}`);
-        
-        // Use Chrome's downloads API with enhanced error handling
-        return new Promise((resolve, reject) => {
-            chrome.downloads.download({
-                url: downloadUrl,
-                filename: filename,
-                saveAs: false,
-                conflictAction: 'uniquify'
-            }, (downloadId) => {
-                if (chrome.runtime.lastError) {
-                    console.error(`Download failed for ${filename}:`, chrome.runtime.lastError);
-                    
-                    // Check if the error is related to folder creation
-                    const errorMessage = chrome.runtime.lastError.message.toLowerCase();
-                    if (errorMessage.includes('path') || 
-                        errorMessage.includes('directory') || 
-                        errorMessage.includes('folder') ||
-                        errorMessage.includes('invalid filename') ||
-                        useFolderStructure) {
-                        
-                        console.log('Folder structure not supported, retrying with flat filename...');
-                        
-                        // Retry with flat filename structure
-                        const flatFilename = `${folderName.replace(/\//g, '_').replace(/\\/g, '_')}_${safeTitle}_${soundEffect.id}.${extension}`;
-                        
-                        chrome.downloads.download({
-                            url: downloadUrl,
-                            filename: flatFilename,
-                            saveAs: false,
-                            conflictAction: 'uniquify'
-                        }, (retryDownloadId) => {
-                            if (chrome.runtime.lastError) {
-                                console.error(`Retry download also failed for ${flatFilename}:`, chrome.runtime.lastError);
-                                reject(new Error(chrome.runtime.lastError.message));
-                            } else {
-                                console.log(`Started retry download with flat structure: ${retryDownloadId} - ${flatFilename}`);
-                                // Return special value to indicate folder structure failed
-                                resolve('FOLDER_STRUCTURE_FAILED');
-                            }
-                        });
-                    } else {
-                        reject(new Error(chrome.runtime.lastError.message));
-                    }
-                } else {
-                    console.log(`Started Chrome download: ${downloadId} - ${filename}`);
-                    resolve(downloadId);
-                }
-            });
-        });
+        // Use the improved directory structure handling
+        return await downloadWithDirectoryStructure(downloadUrl, folderName, fullFilename, useFolderStructure);
         
     } catch (error) {
         console.error(`Error processing sound effect ${soundEffect.id}:`, error);
@@ -1217,608 +1459,269 @@ async function downloadSoundEffect(soundEffect, folderName, tabId, useFolderStru
     }
 }
 
-// Fallback to extract audio URL from page content
-async function extractAudioUrlFromPage(url) {
+// Extract audio URL from page function
+async function extractAudioUrlFromPage(pageUrl) {
     try {
-        // Load the page content in a temporary XMLHttpRequest
-        const response = await fetch(url, {
-            method: 'GET',
+        console.log(`Attempting to extract audio URL from: ${pageUrl}`);
+        
+        // Fetch the page content
+        const response = await fetch(pageUrl, {
             headers: {
-                'Content-Type': 'text/html',
-                'X-Requested-With': 'XMLHttpRequest'
-            }
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            },
+            signal: AbortSignal.timeout(10000) // 10 second timeout
         });
         
         if (!response.ok) {
-            throw new Error(`Failed to fetch page content: ${response.status} ${response.statusText}` );
+            throw new Error(`HTTP ${response.status}`);
         }
         
-        const pageContent = await response.text();
+        const html = await response.text();
         
-        // Parse the page content to find audio URL
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(pageContent, 'text/html');
+        // Look for common patterns in Pixabay's HTML that contain audio URLs
+        const audioUrlPatterns = [
+            /"preview":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /"audioURL":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /"download":\s*"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /data-audio-url="([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /src="([^"]*\.(?:mp3|wav|ogg)[^"]*)"/gi,
+            /https:\/\/cdn\.pixabay\.com\/audio\/[^"']*\.(?:mp3|wav|ogg)/gi,
+            /https:\/\/pixabay\.com\/[^"']*\.(?:mp3|wav|ogg)/gi
+        ];
         
-        // Look for the audio URL in <audio> tags or other known patterns
-        let audioUrl = '';
-        
-        // Method 1: Direct <audio> tag extraction
-        const audioElement = doc.querySelector('audio');
-        if (audioElement && audioElement.src) {
-            audioUrl = audioElement.src;
-        }
-        
-        if (audioUrl) return audioUrl;
-        
-        // Method 2: Look for data-src or src attributes in JS variables
-        const scriptTags = doc.querySelectorAll('script');
-        scriptTags.forEach((script) => {
-            const content = script.innerHTML;
-            
-            // Look for patterns like "var audioUrl = '...'"
-            const urlMatch = content.match(/['"]([^'"]+\.mp3|ogg|wav|aac)['"]/i);
-            if (urlMatch) {
-                audioUrl = urlMatch[1];
+        for (const pattern of audioUrlPatterns) {
+            const matches = html.match(pattern);
+            if (matches && matches.length > 0) {
+                // Extract the URL from the first match
+                let audioUrl = matches[0];
+                
+                // Clean up the URL if it's in JSON format
+                if (audioUrl.includes('"')) {
+                    const urlMatch = audioUrl.match(/"([^"]*\.(?:mp3|wav|ogg)[^"]*)"/);
+                    if (urlMatch) {
+                        audioUrl = urlMatch[1];
+                    }
+                }
+                
+                // Clean up data attribute format
+                if (audioUrl.includes('data-audio-url=')) {
+                    const urlMatch = audioUrl.match(/data-audio-url="([^"]*)"/);
+                    if (urlMatch) {
+                        audioUrl = urlMatch[1];
+                    }
+                }
+                
+                // Clean up src attribute format
+                if (audioUrl.includes('src=')) {
+                    const urlMatch = audioUrl.match(/src="([^"]*)"/);
+                    if (urlMatch) {
+                        audioUrl = urlMatch[1];
+                    }
+                }
+                
+                return audioUrl;
             }
-        });
-        
-        if (audioUrl) return audioUrl;
-        
-        // Method 3: Look for meta tags with audio information
-        const metaDescription = doc.querySelector('meta[name="description"]');
-        if (metaDescription && metaDescription.content) {
-            const metaUrlMatch = metaDescription.content.match(/(?:mp3|ogg|wav|aac):\/\/[^\'" ]+/i);
-            if (metaUrlMatch) {
-                audioUrl = metaUrlMatch[0];
-            }
         }
         
-        return audioUrl || 'NO_AUDIO_URL_FOUND';
+        console.log('No audio URL found in page source');
+        return null;
     } catch (error) {
         console.error('Error extracting audio URL from page:', error);
-        return 'EXTRACTION_FAILED';
+        return null;
     }
 }
 
-// Simulate download button click on the page
-async function simulateDownloadButtonClick(url, soundEffectId, tabId) {
-    return new Promise((resolve, reject) => {
-        chrome.scripting.executeScript({
-            target: { tabId: tabId },
-            function: clickDownloadFromProfilePage,
-            args: [url, soundEffectId]
-        }, (results) => {
-            if (chrome.runtime.lastError) {
-                console.error('Chrome scripting error:', chrome.runtime.lastError.message);
-                return reject(new Error(chrome.runtime.lastError.message));
-            }
-            
-            // Check if the script reported success
-            if (results && results[0] && results[0].result) {
-                console.log('Script executed, result:', results[0].result);
-                resolve(results[0].result);
-            } else {
-                reject(new Error('Failed to click download button, no result from script'));
-            }
-        });
-    });
-}
-
-// Function to find and click download buttons from a user profile page
-function clickDownloadFromProfilePage(profileUrl, soundEffectId) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            console.log(`Looking for sound effect ${soundEffectId} on profile page: ${profileUrl}` );
-            
-            // Ensure we're on the correct profile page
-            if (!window.location.href.includes('/users/')) {
-                console.log(`Navigating to profile page: ${profileUrl}` );
-                window.location.href = profileUrl;
-                
-                // Wait for page load
-                await new Promise(resolve => {
-                    if (document.readyState === 'complete') {
-                        resolve();
-                    } else {
-                        window.addEventListener('load', resolve);
-                    }
-                });
-                
-                // Additional wait for dynamic content
-                await new Promise(resolve => setTimeout(resolve, 3000));
-            }
-            
-            console.log('Searching for audio containers on profile page...' );
-            
-            // Method 1: Find the specific sound effect container by ID in audioRow
-            let targetContainer = null;
-            
-            // Look through all audioRow containers to find the one with matching ID
-            const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-            console.log(`Found ${audioRows.length} audioRow containers on profile page` );
-            
-            for (const container of audioRows) {
-                // Look for links that contain the sound effect ID
-                const links = container.querySelectorAll('a');
-                for (const link of links) {
-                    if (link.href && link.href.includes(soundEffectId)) {
-                        targetContainer = container;
-                        console.log(`Found target audioRow container for sound effect ${soundEffectId}` );
-                        break;
-                    }
-                }
-                if (targetContainer) break;
-            }
-            
-            // Fallback: try overlayContainer approach if audioRow not found
-            if (!targetContainer) {
-                const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP');
-                console.log(`Fallback: Found ${overlayContainers.length} overlayContainer elements` );
-                
-                for (const container of overlayContainers) {
-                    const links = container.querySelectorAll('a');
-                    for (const link of links) {
-                        if (link.href && link.href.includes(soundEffectId)) {
-                            targetContainer = container;
-                            console.log(`Found target overlayContainer for sound effect ${soundEffectId}` );
-                            break;
-                        }
-                    }
-                    if (targetContainer) break;
-                }
-            }
-            
-            if (!targetContainer && (audioRows.length > 0 || document.querySelectorAll('.overlayContainer--0ZpHP').length > 0)) {
-                // Fallback: if we can't find by ID, try to find by index
-                const containerIndex = parseInt(soundEffectId.replace('sound_', ''));
-                if (!isNaN(containerIndex)) {
-                    if (containerIndex < audioRows.length) {
-                        targetContainer = audioRows[containerIndex];
-                        console.log(`Using audioRow at index ${containerIndex} as fallback` );
-                    } else {
-                        const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP');
-                        if (containerIndex < overlayContainers.length) {
-                            targetContainer = overlayContainers[containerIndex];
-                            console.log(`Using overlayContainer at index ${containerIndex} as fallback` );
-                        }
-                    }
-                }
-            }
-            
-            if (targetContainer) {
-                console.log('Found target container, looking for download button using new DOM structure...' );
-                
-                // NEW METHOD: Look for download button using the specific DOM structure provided
-                // div audioRow--nAm4Z
-                //  - div rightSection--CtE31
-                //   - div actionButtons--NbgQi
-                //    - div triggerWrapper--JRqL6
-                //     - button button--9NFL8 ghost--wIHwU light--C3NP- center--ZZf40
-                
-                const rightSection = targetContainer.querySelector('.rightSection--CtE31');
-                if (rightSection) {
-                    console.log('Found rightSection--CtE31' );
-                    
-                    const actionButtons = rightSection.querySelector('.actionButtons--NbgQi');
-                    if (actionButtons) {
-                        console.log('Found actionButtons--NbgQi' );
-                        
-                        const triggerWrapper = actionButtons.querySelector('.triggerWrapper--JRqL6');
-                        if (triggerWrapper) {
-                            console.log('Found triggerWrapper--JRqL6' );
-                            
-                            const downloadButton = triggerWrapper.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                            if (downloadButton) {
-                                console.log('Found download button in triggerWrapper, clicking directly on profile page...' );
-                                
-                                // Simulate human click with proper events
-                                const clickEvent = new MouseEvent('click', {
-                                    view: window,
-                                    bubbles: true,
-                                    cancelable: true,
-                                    button: 0
-                                });
-                                
-                                downloadButton.dispatchEvent(clickEvent);
-                                downloadButton.click();
-                                
-                                // Wait a moment to ensure download starts
-                                await new Promise(resolve => setTimeout(resolve, 1000));
-                                
-                                resolve('SUCCESS: Download button clicked directly from profile page');
-                                return;
-                            } else {
-                                console.log('No download button found in triggerWrapper');
-                            }
-                        } else {
-                            console.log('No triggerWrapper--JRqL6 found in actionButtons');
-                        }
-                    } else {
-                        console.log('No actionButtons--NbgQi found in rightSection');
-                    }
-                } else {
-                    console.log('No rightSection--CtE31 found in container');
-                }
-                
-                // FALLBACK METHOD 1: Look for any download button in the container using original selector
-                const fallbackDownloadButton = targetContainer.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                if (fallbackDownloadButton) {
-                    console.log('Found download button using fallback selector, clicking...' );
-                    
-                    const clickEvent = new MouseEvent('click', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true,
-                        button: 0
-                    });
-                    
-                    fallbackDownloadButton.dispatchEvent(clickEvent);
-                    fallbackDownloadButton.click();
-                    
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    resolve('SUCCESS: Download button clicked using fallback method');
-                    return;
-                }
-                
-                // FALLBACK METHOD 2: Try clicking triggerWrapper itself if button not found
-                const triggerWrapperDirect = targetContainer.querySelector('.triggerWrapper--JRqL6');
-                if (triggerWrapperDirect) {
-                    console.log('Clicking triggerWrapper directly as fallback...' );
-                    
-                    const clickEvent = new MouseEvent('click', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true,
-                        button: 0
-                    });
-                    
-                    triggerWrapperDirect.dispatchEvent(clickEvent);
-                    triggerWrapperDirect.click();
-                    
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    
-                    resolve('SUCCESS: TriggerWrapper clicked directly');
-                    return;
-                }
-                
-                console.log('No download button found using new DOM structure, using old navigation method as last resort...' );
-                
-                // LAST RESORT: Navigate to detail page (old method)
-                const soundEffectLink = targetContainer.querySelector('a');
-                if (soundEffectLink && soundEffectLink.href) {
-                    console.log(`LAST RESORT: Navigating to sound effect detail page: ${soundEffectLink.href}` );
-                    
-                    // Navigate to the detail page
-                    window.location.href = soundEffectLink.href;
-                    
-                    // Wait for navigation and page load
-                    await new Promise(resolve => {
-                        if (document.readyState === 'complete') {
-                            resolve();
-                        } else {
-                            window.addEventListener('load', resolve);
-                        }
-                    });
-                    
-                    // Additional wait for dynamic content
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    
-                    // Now look for download button on the detail page
-                    console.log('Looking for download button on detail page...' );
-                    
-                    const actionButtons = document.querySelector('.actionButtons--NbgQi');
-                    if (actionButtons) {
-                        const detailDownloadButton = actionButtons.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                        if (detailDownloadButton) {
-                            console.log('Found download button on detail page, clicking...' );
-                            
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true,
-                                button: 0
-                            });
-                            
-                            detailDownloadButton.dispatchEvent(clickEvent);
-                            detailDownloadButton.click();
-                            
-                            resolve('SUCCESS: Download button clicked from detail page (navigation fallback)');
-                            return;
-                        }
-                    }
-                }
-            }
-            
-            // If we can't find a specific container, try clicking all download-related buttons on the current page
-            console.log('Could not find specific container, trying all download buttons on page...' );
-            
-            // Look for all triggerWrapper elements on the page
-            const allTriggerWrappers = document.querySelectorAll('.triggerWrapper--JRqL6');
-            console.log(`Found ${allTriggerWrappers.length} triggerWrapper elements on page` );
-            
-            if (allTriggerWrappers.length > 0) {
-                // Click the first triggerWrapper we find
-                const firstWrapper = allTriggerWrappers[0];
-                const wrapperButton = firstWrapper.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                
-                if (wrapperButton) {
-                    console.log('Clicking first available download button in triggerWrapper...' );
-                    
-                    const clickEvent = new MouseEvent('click', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true,
-                        button: 0
-                    });
-                    
-                    wrapperButton.dispatchEvent(clickEvent);
-                    wrapperButton.click();
-                    
-                    resolve('SUCCESS: Clicked first available download button');
-                    return;
-                }
-            }
-            
-            reject(new Error(`No download method found for sound effect ${soundEffectId} on profile page` ));
-            
-        } catch (error) {
-            console.error('Error clicking download from profile page:', error);
-            reject(error);
-        }
-    });
-}
-
-// Function to be injected into the page to click the download button (for individual pages)
-function clickDownloadButtonOnPage(targetPageUrl, soundEffectId) {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // If we're not on the target page, navigate to it first
-            if (window.location.href !== targetPageUrl) {
-                console.log(`Navigating to target page: ${targetPageUrl}` );
-                window.location.href = targetPageUrl;
-                
-                // Wait for page load
-                await new Promise(resolve => {
-                    if (document.readyState === 'complete') {
-                        resolve();
-                    } else {
-                        window.addEventListener('load', resolve);
-                    }
-                });
-                
-                // Additional wait for dynamic content
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-            
-            console.log(`Looking for download button on page for sound effect: ${soundEffectId}` );
-            
-            // METHOD 1: Look for download button using the new DOM structure
-            // div audioRow--nAm4Z -> div rightSection--CtE31 -> div actionButtons--NbgQi -> div triggerWrapper--JRqL6 -> button
-            const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-            console.log(`Found ${audioRows.length} audioRow elements on page` );
-            
-            for (const audioRow of audioRows) {
-                const rightSection = audioRow.querySelector('.rightSection--CtE31');
-                if (rightSection) {
-                    const actionButtons = rightSection.querySelector('.actionButtons--NbgQi');
-                    if (actionButtons) {
-                        const triggerWrapper = actionButtons.querySelector('.triggerWrapper--JRqL6');
-                        if (triggerWrapper) {
-                            const downloadButton = triggerWrapper.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                            if (downloadButton) {
-                                console.log(`Found download button in audioRow structure, clicking...` );
-                                
-                                // Simulate human click with all the proper events
-                                const clickEvent = new MouseEvent('click', {
-                                    view: window,
-                                    bubbles: true,
-                                    cancelable: true,
-                                    button: 0
-                                });
-                                
-                                downloadButton.dispatchEvent(clickEvent);
-                                downloadButton.click();
-                                
-                                resolve('SUCCESS: Download button clicked using audioRow structure');
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // METHOD 2: Look for the specific download button classes in actionButtons (fallback for individual pages)
-            const actionButtons = document.querySelector('.actionButtons--NbgQi');
-            if (actionButtons) {
-                // First try with triggerWrapper
-                const triggerWrapper = actionButtons.querySelector('.triggerWrapper--JRqL6');
-                if (triggerWrapper) {
-                    const downloadButton = triggerWrapper.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                    if (downloadButton) {
-                        console.log(`Found download button in actionButtons triggerWrapper, clicking...` );
-                        
-                        const clickEvent = new MouseEvent('click', {
-                            view: window,
-                            bubbles: true,
-                            cancelable: true,
-                            button: 0
-                        });
-                        
-                        downloadButton.dispatchEvent(clickEvent);
-                        downloadButton.click();
-                        
-                        resolve('SUCCESS: Download button clicked from actionButtons');
-                        return;
-                    }
-                }
-                
-                // Fallback: look for download button directly in actionButtons
-                const directDownloadButton = actionButtons.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40');
-                if (directDownloadButton) {
-                    console.log(`Found download button directly in actionButtons, clicking...` );
-                    
-                    const clickEvent = new MouseEvent('click', {
-                        view: window,
-                        bubbles: true,
-                        cancelable: true,
-                        button: 0
-                    });
-                    
-                    directDownloadButton.dispatchEvent(clickEvent);
-                    directDownloadButton.click();
-                    
-                    resolve('SUCCESS: Download button clicked directly from actionButtons');
-                    return;
-                }
-            }
-            
-            // METHOD 3: Look for other download buttons with various selectors
-            const downloadSelectors = [
-                // Primary: triggerWrapper approach
-                '.triggerWrapper--JRqL6 .button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40',
-                '.triggerWrapper--JRqL6 button',
-                
-                // Secondary: actionButtons approach
-                '.actionButtons--NbgQi .button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40',
-                '.actionButtons--NbgQi button[class*="button--"]',
-                '.actionButtons--NbgQi a[href*="download"]',
-                
-                // Tertiary: generic download buttons
-                'button[title*="download" i]',
-                'button[aria-label*="download" i]',
-
-                // Added additional common download button classes
-                '.download-button',
-                '.btn-download',
-                '[class*="download"]'
-            ];
-            
-            for (const selector of downloadSelectors) {
-                const buttons = document.querySelectorAll(selector);
-                console.log(`Found ${buttons.length} elements with selector: ${selector}` );
-                
-                for (const button of buttons) {
-                    // Check if this looks like a download button
-                    const text = button.textContent?.toLowerCase() || '';
-                    const title = button.title?.toLowerCase() || '';
-                    const ariaLabel = button.getAttribute('aria-label')?.toLowerCase() || '';
-                    const href = button.href || '';
-                    
-                    if (text.includes('download') || 
-                        title.includes('download') || 
-                        ariaLabel.includes('download') ||
-                        href.includes('download') ||
-                        button.classList.contains('button--9NFL8') ||
-                        selector.includes('triggerWrapper')) {
-                        
-                        console.log(`Clicking potential download button: ${selector}` );
-                        
-                        // Simulate human click
-                        const clickEvent = new MouseEvent('click', {
-                            view: window,
-                            bubbles: true,
-                            cancelable: true,
-                            button: 0
-                        });
-                        
-                        button.dispatchEvent(clickEvent);
-                        button.click();
-                        
-                        // Wait a moment to see if download started
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        
-                        resolve('SUCCESS: Download button clicked (fallback method)');
-                        return;
-                    }
-                }
-            }
-            
-            // METHOD 4: Try clicking triggerWrapper elements directly
-            const allTriggerWrappers = document.querySelectorAll('.triggerWrapper--JRqL6');
-            console.log(`Found ${allTriggerWrappers.length} triggerWrapper elements on page` );
-            
-            for (const wrapper of allTriggerWrappers) {
-                console.log(`Clicking triggerWrapper directly...` );
-                
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true,
-                    button: 0
-                });
-                
-                wrapper.dispatchEvent(clickEvent);
-                wrapper.click();
-                
-                // Wait briefly between clicks
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-            
-            if (allTriggerWrappers.length > 0) {
-                resolve('SUCCESS: Clicked all triggerWrapper elements');
-                return;
-            }
-            
-            reject(new Error('No download button found on page'));
-            
-        } catch (error) {
-            console.error('Error clicking download button:', error);
-            reject(error);
-        }
-    });
-}
-
-// Utilities
-function getFileExtensionFromUrl(url) {
-    if (!url) return 'mp3';
-    
+// Simulate download button click
+async function simulateDownloadButtonClick(pageUrl, soundEffectId, tabId) {
     try {
-        const urlObj = new URL(url);
-        const pathname = urlObj.pathname;
-        const extension = pathname.split('.').pop()?.toLowerCase();
+        console.log(`Attempting to simulate download button click for ${soundEffectId} on ${pageUrl}`);
         
-        if (extension && ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac'].includes(extension)) {
-            return extension;
+        // Execute script in the target tab to click the download button
+        const result = await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            function: clickDownloadButtonOnPage,
+            args: [pageUrl, soundEffectId]
+        });
+        
+        if (result && result[0] && result[0].result) {
+            return result[0].result;
+        } else {
+            throw new Error('No result from button click script');
         }
         
-        return 'mp3'; // Default for audio files
-    } catch {
-        return 'mp3';
+    } catch (error) {
+        console.error(`Error simulating download button click for ${soundEffectId}:`, error);
+        throw error;
     }
 }
 
-function pauseDownload() {
-    isDownloadPaused = true;
-    updateExtensionState({
-        isPaused: true,
-        lastStatus: { icon: 'Pause', message: 'Download paused', type: 'warning' }
-    });
-    console.log('Download paused');
-    sendMessageToPopup({ action: 'DOWNLOAD_PAUSED' });
+// Function to be injected into the page to click download button
+function clickDownloadButtonOnPage(targetPageUrl, soundEffectId) {
+    try {
+        console.log(`Looking for download button for sound effect ${soundEffectId} on page: ${window.location.href}`);
+        console.log(`Target page URL: ${targetPageUrl}`);
+        
+        // Check if we need to navigate to the target page
+        if (window.location.href !== targetPageUrl) {
+            console.log(`Current page (${window.location.href}) does not match target (${targetPageUrl})`);
+            
+            // Instead of navigating (which causes issues), return a specific code
+            return 'NAVIGATION_NEEDED: Different page detected, will handle differently';
+        }
+        
+        // Wait for page to load completely
+        if (document.readyState !== 'complete') {
+            console.log('Page not fully loaded, waiting...');
+            return 'WAITING: Page still loading';
+        }
+        
+        // Method 1: Find download button using specific classes for audio pages
+        const actionButtons = document.querySelector('.actionButtons--NbgQi');
+        if (actionButtons) {
+            // Look for download button (typically ghost/light colored)
+            const downloadButton = actionButtons.querySelector('.button--9NFL8.ghost--wIHwU.light--C3NP-.center--ZZf40') ||
+                                 actionButtons.querySelector('.button--9NFL8[class*="ghost"]') ||
+                                 actionButtons.querySelector('.button--9NFL8[class*="download"]');
+            
+            if (downloadButton) {
+                console.log('Found download button with specific classes');
+                
+                // Check if button is visible and clickable
+                const rect = downloadButton.getBoundingClientRect();
+                const style = window.getComputedStyle(downloadButton);
+                
+                const isClickable = (
+                    rect.width > 0 && 
+                    rect.height > 0 &&
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    style.opacity !== '0' &&
+                    !downloadButton.disabled
+                );
+                
+                if (isClickable) {
+                    // Simulate human click with proper events
+                    const clickEvent = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true,
+                        button: 0
+                    });
+                    
+                    downloadButton.dispatchEvent(clickEvent);
+                    downloadButton.click();
+                    
+                    console.log('Successfully clicked download button');
+                    return 'SUCCESS: Download button clicked with specific classes';
+                } else {
+                    console.log('Download button found but not clickable');
+                }
+            } else {
+                console.log('No download button found in action buttons area');
+            }
+        } else {
+            console.log('No action buttons area found on page');
+        }
+        
+        // Method 2: Look for download-related selectors across the page
+        const downloadSelectors = [
+            'a[href*="download"]',
+            'button[title*="download" i]',
+            'button[aria-label*="download" i]',
+            '.download-button',
+            '.btn-download',
+            '[data-testid*="download"]',
+            'button:has-text("Download")',
+            'a:has-text("Download")'
+        ];
+        
+        for (const selector of downloadSelectors) {
+            try {
+                const elements = document.querySelectorAll(selector);
+                console.log(`Found ${elements.length} elements with selector: ${selector}`);
+                
+                // Click the first visible and clickable one
+                for (const element of elements) {
+                    const rect = element.getBoundingClientRect();
+                    const style = window.getComputedStyle(element);
+                    
+                    const isClickable = (
+                        rect.width > 0 && 
+                        rect.height > 0 &&
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0' &&
+                        !element.disabled
+                    );
+                    
+                    if (isClickable) {
+                        console.log(`Clicking visible download element with selector: ${selector}`);
+                        element.click();
+                        return `SUCCESS: Download clicked with selector ${selector}`;
+                    }
+                }
+            } catch (error) {
+                console.log(`Error with selector ${selector}:`, error.message);
+            }
+        }
+        
+        // Method 3: Look for any button in action area that might be download
+        if (actionButtons) {
+            const allButtons = actionButtons.querySelectorAll('button, a');
+            console.log(`Found ${allButtons.length} total buttons in action area`);
+            
+            for (const button of allButtons) {
+                const text = button.textContent || button.title || button.getAttribute('aria-label') || '';
+                const href = button.href || '';
+                
+                // Check if this looks like a download button
+                if (text.toLowerCase().includes('download') || 
+                    href.toLowerCase().includes('download') ||
+                    button.className.toLowerCase().includes('download')) {
+                    
+                    console.log(`Found potential download button with text: "${text}" and href: "${href}"`);
+                    
+                    // Check if clickable
+                    const rect = button.getBoundingClientRect();
+                    const style = window.getComputedStyle(button);
+                    
+                    const isClickable = (
+                        rect.width > 0 && 
+                        rect.height > 0 &&
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0' &&
+                        !button.disabled
+                    );
+                    
+                    if (isClickable) {
+                        console.log(`Clicking button with download indication`);
+                        button.click();
+                        return 'SUCCESS: Download button clicked by content analysis';
+                    }
+                }
+            }
+        }
+        
+        // Method 4: Check if we're on the wrong type of page
+        const pageUrl = window.location.href;
+        if (pageUrl.includes('/users/') && !pageUrl.match(/\/music-\d+\/|\/sound-effect-\d+\/|\/audio-\d+\//)) {
+            console.log('Detected profile page instead of individual sound effect page');
+            return 'ERROR: On profile page instead of individual sound effect page';
+        }
+        
+        console.log('No download button found after exhaustive search');
+        return 'ERROR: No download button found on individual page';
+        
+    } catch (error) {
+        console.error('Error in clickDownloadButtonOnPage:', error);
+        return `ERROR: ${error.message}`;
+    }
 }
 
-function resumeDownload() {
-    isDownloadPaused = false;
-    updateExtensionState({
-        isPaused: false,
-        lastStatus: { icon: 'Play', message: 'Download resumed', type: 'success' }
-    });
-    console.log('Download resumed');
-    sendMessageToPopup({ action: 'DOWNLOAD_RESUMED' });
-}
-
-function cancelDownload() {
-    isDownloadCanceled = true;
-    isDownloadPaused = false;
-    downloadQueue = [];
-    updateExtensionState({
-        isDownloading: false,
-        isPaused: false,
-        lastStatus: { icon: 'X', message: 'Download canceled', type: 'error' }
-    });
-    console.log('Download canceled');
-    sendMessageToPopup({ action: 'DOWNLOAD_CANCELED' });
+// Utility functions
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function sanitizeFilename(filename) {
@@ -1831,30 +1734,82 @@ function sanitizeFilename(filename) {
         .substring(0, 50);
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Helper function to send messages to popup safely
-async function sendMessageToPopup(message) {
+function getFileExtensionFromUrl(url) {
+    if (!url) return 'mp3';
+    
     try {
-        await chrome.runtime.sendMessage(message);
+        const pathname = new URL(url).pathname;
+        const extension = pathname.split('.').pop();
+        return extension && extension.length <= 4 ? extension : 'mp3';
     } catch (error) {
-        // Popup might be closed, which is normal - just log it
-        console.log('Could not send message to popup (popup may be closed):', message.action);
+        return 'mp3';
     }
 }
 
-// Handle extension installation
-chrome.runtime.onInstalled.addListener((details) => {
-    if (details.reason === 'install') {
-        console.log('Pixabay Sound Effects Downloader installed');
-        chrome.storage.local.set({
-            'firstInstall': true,
-            'installDate': new Date().toISOString(),
-            'scrapingMode': 'sound-effects',
-            'autoLikeEnabled': false,
-            'version': '3.1'
-        });
+// Auto-like settings
+async function setAutoLikeSetting(enabled) {
+    try {
+        await chrome.storage.local.set({ 'autoLikeEnabled': enabled });
+        console.log('Auto-like setting saved:', enabled);
+    } catch (error) {
+        console.error('Error saving auto-like setting:', error);
     }
-});
+}
+
+async function getAutoLikeSetting() {
+    try {
+        const result = await chrome.storage.local.get(['autoLikeEnabled']);
+        return result.autoLikeEnabled || false;
+    } catch (error) {
+        console.error('Error getting auto-like setting:', error);
+        return false;
+    }
+}
+
+// Download control functions
+function pauseDownload() {
+    isDownloadPaused = true;
+    updateExtensionState({
+        isPaused: true,
+        lastStatus: { icon: 'Pause', message: 'Download paused', type: 'warning' }
+    });
+    sendMessageToPopup({
+        action: 'DOWNLOAD_PAUSED'
+    });
+}
+
+function resumeDownload() {
+    isDownloadPaused = false;
+    updateExtensionState({
+        isPaused: false,
+        lastStatus: { icon: 'Play', message: 'Download resumed', type: 'success' }
+    });
+    sendMessageToPopup({
+        action: 'DOWNLOAD_RESUMED'
+    });
+}
+
+function cancelDownload() {
+    isDownloadCanceled = true;
+    isDownloadPaused = false;
+    updateExtensionState({
+        isDownloading: false,
+        isPaused: false,
+        lastStatus: { icon: 'X', message: 'Download canceled', type: 'error' }
+    });
+    sendMessageToPopup({
+        action: 'DOWNLOAD_CANCELED'
+    });
+}
+
+// Helper function to send messages to popup
+function sendMessageToPopup(message) {
+    try {
+        chrome.runtime.sendMessage(message).catch(() => {
+            // Ignore errors if popup is closed
+            console.log('Could not send message to popup (popup may be closed)');
+        });
+    } catch (error) {
+        console.log('Could not send message to popup:', error.message);
+    }
+}
