@@ -509,47 +509,48 @@ async function startSoundEffectsDownload() {
         console.log('Download not possible - either already downloading or no items found');
         return;
     }
-    
+
     isDownloading = true;
     isPaused = false;
-    
+
     const downloadBtn = document.getElementById('downloadBtn');
     const originalText = downloadBtn.innerHTML;
-    
+
     try {
         console.log('Starting sound effects download');
-        
+
         // Show progress and controls
         showProgress();
         showDownloadControls();
         downloadBtn.innerHTML = '<div class="spinner"></div> Starting download...';
         downloadBtn.disabled = true;
-        
+
         // Get current tab
         const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
+
         // Check if auto-like is enabled and inform user
         const autoLikeToggle = document.getElementById('autoLikeToggle');
         if (autoLikeToggle.checked) {
             updateStatusMessage('i', 'Checking login status for auto-like...', 'success');
         }
-        
-        // Send message to background script to start download
+
+        // Send message to background script to start download, include scannedItems
         const response = await chrome.runtime.sendMessage({
             action: 'START_DOWNLOAD',
             tabId: activeTab.id,
-            config: downloadConfig // Include configuration
+            config: downloadConfig, // Include configuration
+            items: scannedItems // Pass scanned items to background
         });
-        
+
         console.log('Download start response:', response);
         updateStatusMessage('Arrow', 'Starting download process...', 'success');
-        
+
     } catch (error) {
         console.error('Download error:', error);
         updateStatusMessage('X', `Download failed: ${error.message}`, 'error');
         hideProgress();
         hideDownloadControls();
-        
+
         // Reset button
         downloadBtn.innerHTML = originalText;
         downloadBtn.disabled = false;

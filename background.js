@@ -333,7 +333,33 @@ function extractUserInfoFromPage() {
         }
         
         // IMPROVED: Check for login status by looking for "Logout" text visibility
-        isLoggedIn = checkLoginStatus();
+        // Inline checkLoginStatus logic here
+        try {
+            let foundLogout = false;
+            const allElements = document.querySelectorAll('*');
+            for (const element of allElements) {
+                const text = element.textContent || element.innerText || '';
+                if (text.includes('Logout') || text.includes('logout')) {
+                    // Check if the element is visible
+                    const rect = element.getBoundingClientRect();
+                    const style = window.getComputedStyle(element);
+                    const isVisible = (
+                        rect.width > 0 &&
+                        rect.height > 0 &&
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0'
+                    );
+                    if (isVisible) {
+                        foundLogout = true;
+                        break;
+                    }
+                }
+            }
+            isLoggedIn = foundLogout;
+        } catch (e) {
+            isLoggedIn = false;
+        }
         
         // Extract user ID from URL or page elements
         if (urlMatch) {
@@ -386,12 +412,32 @@ function extractPageInfoFromPage() {
         // Extract target information
         let targetName = 'unknown';
         let targetID = 'unknown';
-        
-        // Extract username and ID from URL
+
+        // User page
         const userMatch = pathname.match(/\/users\/([^\/\?]+)/);
         if (userMatch) {
             targetName = userMatch[1];
             targetID = userMatch[1]; // Use username as ID if no numeric ID found
+        } else {
+            // Search page
+            const searchMatch = pathname.match(/\/sounds\/?$/) || pathname.match(/\/audio-search\/?$/) || pathname.match(/\/sound-effects\/?$/);
+            if (searchMatch && searchParams.has('q')) {
+                targetName = 'search_' + searchParams.get('q').replace(/\s+/g, '_').toLowerCase();
+                targetID = targetName;
+            } else {
+                // Category page
+                const categoryMatch = pathname.match(/\/sound-effects\/([^\/\?]+)/);
+                if (categoryMatch) {
+                    targetName = 'category_' + categoryMatch[1].replace(/\s+/g, '_').toLowerCase();
+                    targetID = targetName;
+                } else {
+                    // Home or all sounds
+                    if (pathname === '/sounds/' || pathname === '/sound-effects/' || pathname === '/audio/') {
+                        targetName = 'all-sounds';
+                        targetID = 'all-sounds';
+                    }
+                }
+            }
         }
         
         // Try to extract numeric user ID from page elements
@@ -735,10 +781,13 @@ function handleSoundEffectsExtracted(message, tabId) {
 
 // Handle explicit download start request
 async function handleStartDownload(request, tabId) {
-    const { tabId: requestTabId } = request;
+    const { tabId: requestTabId, items } = request;
     const targetTabId = requestTabId || tabId;
-    
-    if (scannedSoundEffects.length === 0) {
+
+    // Use items from request if provided, otherwise fallback to scannedSoundEffects
+    const soundEffectsToDownload = Array.isArray(items) && items.length > 0 ? items : scannedSoundEffects;
+
+    if (!soundEffectsToDownload || soundEffectsToDownload.length === 0) {
         const errorMsg = 'No sound effects to download. Please scan first.';
         updateExtensionState({
             lastStatus: { icon: 'X', message: errorMsg, type: 'error' }
@@ -749,18 +798,18 @@ async function handleStartDownload(request, tabId) {
         });
         return;
     }
-    
-    console.log(`Starting download of ${scannedSoundEffects.length} sound effects`);
-    
+
+    console.log(`Starting download of ${soundEffectsToDownload.length} sound effects`);
+
     // Update state
     updateExtensionState({
         isDownloading: true,
         isPaused: false,
-        currentProgress: { current: 0, total: scannedSoundEffects.length },
+        currentProgress: { current: 0, total: soundEffectsToDownload.length },
         lastStatus: { icon: 'Arrow', message: 'Starting download process...', type: 'success' }
     });
-    
-    await startSoundEffectsDownload(scannedSoundEffects, targetTabId);
+
+    await startSoundEffectsDownload(soundEffectsToDownload, targetTabId);
 }
 
 function handleScanningError(message) {
