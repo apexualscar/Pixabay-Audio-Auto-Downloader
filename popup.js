@@ -337,9 +337,19 @@ function extractUsernameFromUrl(url) {
 }
 
 function updateStatusMessage(icon, message, type = '') {
-    document.getElementById('statusIcon').textContent = icon;
-    document.getElementById('statusMessage').textContent = message;
-    
+    // Larger, centered circle for status
+    let color = '#495057'; // default gray
+    if (icon === 'Check') {
+        color = '#4bc24b'; // green
+    } else if (icon === '!') {
+        color = '#ffc107'; // yellow
+    } else if (icon === 'X') {
+        color = '#dc3545'; // red
+    }
+    const statusIconEl = document.getElementById('statusIcon');
+    statusIconEl.innerHTML = `<span style="display:inline-block;width:15px;height:15px;border-radius:50%;background:${color};vertical-align:middle;margin-left:6px;margin-right:6px;margin-bottom:2px;"></span>`;
+    const statusMessageEl = document.getElementById('statusMessage');
+    statusMessageEl.textContent = message;
     const statusSection = document.querySelector('.status-section');
     statusSection.className = `status-section ${type}`;
 }
