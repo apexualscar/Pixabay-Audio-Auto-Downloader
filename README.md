@@ -1,6 +1,20 @@
-# Pixabay Sound Effects Downloader Chrome Extension
 
-A Chrome extension to extract and download sound effects from Pixabay pages. No API key required!
+# Pixabay Sound Effects Downloader
+
+Chrome extension to extract and download sound effects from Pixabay search, user, or category pages. No API key required.
+
+---
+
+## ⭐ Features at a Glance
+
+- One-click scan and download of all sound effects on any Pixabay page
+- Works on search, user, and category pages
+- Organized downloads (by user, search, or category)
+- Real-time status, progress bar, pause/resume/cancel
+- Modern, minimal UI with Pixabay green theme
+- No API key or account required
+
+---
 
 ---
 
@@ -12,7 +26,7 @@ A Chrome extension to extract and download sound effects from Pixabay pages. No 
 3. Enable "Developer mode"
 4. Click "Load unpacked" and select the project root
 
-**PowerShell (Windows):**
+**PowerShell (Windows only):**
 ```powershell
 .\install-extension.ps1
 ```
@@ -30,11 +44,13 @@ A Chrome extension to extract and download sound effects from Pixabay pages. No 
 
 ## 🖼️ Screenshots
 
-### Usage Flow (GIF)
+See the extension in action and explore the UI below.
+
+#### Usage Flow (GIF)
 
 ![Usage Flow](screenshots/download-flow.gif)
 
-### Key UI States
+#### Key UI States
 
 | Extension Location | Status: Standby | Status: Ready | Status: Error |
 |:------------------:|:---------------:|:-------------:|:-------------:|
@@ -48,7 +64,7 @@ A Chrome extension to extract and download sound effects from Pixabay pages. No 
 
 ## 🛠️ How It Works
 
-1. **DOM Scraping:** Uses advanced CSS selectors to find all sound effect entries on the current Pixabay page.
+1. **DOM Scraping:** Uses advanced CSS selectors to find all sound effect entries on any Pixabay page (search, user, or category).
 2. **User Detection:** Shows user info if on a profile page.
 3. **Scan & Download:** Scans for audio, then downloads all found files with organized naming.
 4. **Progress Tracking:** Real-time status, progress bar, and controls for pause/resume/cancel.
@@ -89,7 +105,7 @@ const titleElements = audioRow.querySelector('.nameAndTitle--KcBAZ');
 
 - Uses Chrome Downloads API
 - Safe, sanitized filenames
-- Handles user profiles and categories
+- Handles user, search, and category pages
 
 ---
 
@@ -134,6 +150,7 @@ Pixabay Sound Effects Downloader/
 
 ## Troubleshooting
 
+
 ### Extension Not Working
 - **Check Extension**: Ensure it's enabled in `chrome://extensions/`
 - **Reload Page**: Refresh the Pixabay page after installing
@@ -144,7 +161,7 @@ Pixabay Sound Effects Downloader/
 - **Page Content**: Ensure the page actually contains audio content
 - **Scroll Down**: Some content loads dynamically as you scroll
 - **Try Different Pages**: Test on known sound effects pages
-- **Check Console**: Open Chrome DevTools for detailed error messages
+- **Check Console**: Open Chrome DevTools (F12) for detailed error messages
 
 ### Download Issues
 - **Storage Space**: Ensure sufficient disk space for downloads
@@ -189,9 +206,9 @@ Pixabay Sound Effects Downloader/
 ## Development
 
 ### Prerequisites
-- .NET 8 SDK
 - Chrome Browser (latest version)
 - Code editor (VS Code, Visual Studio)
+- .NET 8 SDK (only needed if you want to build or modify the optional backend/server)
 
 ### Local Development
 ```bash
