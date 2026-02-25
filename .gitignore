@@ -1,0 +1,6 @@
+# Ignore all Markdown documentation except README.md
+*.md
+!README.md
+
+# Ignore .vs folder
+.vs/
