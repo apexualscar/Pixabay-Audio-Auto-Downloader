@@ -1,103 +1,104 @@
 # Pixabay Sound Effects Downloader Chrome Extension
 
-A focused Chrome extension that extracts and downloads sound effects from Pixabay pages using advanced DOM selectors - no API key required!
+A Chrome extension to extract and download sound effects from Pixabay pages. No API key required!
 
-## Features
+---
 
-- **Focused Sound Effects Extraction**: Specifically designed to extract audio content from Pixabay
-- **Advanced DOM Selectors**: Uses precise CSS selectors (`audioRow--nAm4Z`, `nameAndTitle--KcBAZ`, `overlayContainer--0ZpHP`) for accurate content detection
-- **Direct Page Scraping**: Works on any Pixabay page containing sound effects
-- **No API Key Required**: Direct web scraping eliminates API limitations
-- **Real-time Progress**: Live scanning and download progress tracking
-- **Item List View**: Preview all found sound effects before downloading
-- **Pixabay Green Theme**: Matches Pixabay's official branding
-- **Organized Downloads**: Saves files to `pixabay_sound_effects/` folder
-- **User Profile Detection**: Shows user avatar, name, and ID when on profile pages
+## 📦 Installation
 
-## Installation
+**Manual:**
+1. Download or clone this repository
+2. Open Chrome and go to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked" and select the project root
 
-### Chrome Extension Installation
-
-1. **Download or clone this repository**
-2. **Open Chrome and navigate to** `chrome://extensions/`
-3. **Enable "Developer mode"** in the top right corner
-4. **Click "Load unpacked"** and select the project root directory
-5. **The Pixabay Sound Effects Downloader extension** should now appear with a green "PeX" icon
-
-### Alternative: Use the PowerShell Installer
-
+**PowerShell (Windows):**
 ```powershell
-# Run the automated installer
 .\install-extension.ps1
 ```
 
-## How to Use
+---
 
-### Step 1: Visit Pixabay
-1. **Navigate to any Pixabay page** that contains sound effects
-   - User profiles: `https://pixabay.com/users/username/sound-effects/`
-   - Search results: `https://pixabay.com/sound-effects/search/nature/`
-   - Category pages: `https://pixabay.com/sound-effects/`
+## 🚀 Usage Instructions
 
-### Step 2: Open the Extension
-1. **Click the green "PeX" icon** in your Chrome toolbar
-2. **The extension will detect** if sound effects are available on the current page
-3. **Status indicator** shows when ready to scan
-4. **User profile info** displayed if on a user's page (avatar, name, ID)
+1. **Go to a Pixabay page** with sound effects (search, user, or category)
+2. **Click the extension icon** in your Chrome toolbar
+3. **Scan for sound effects** using the scan button
+4. **Review and download** the found audio files
 
-### Step 3: Scan for Sound Effects
-1. **Click "Scan & Download Sound Effects"** button
-2. **Watch the scanning progress** as it finds audio content
-3. **Review the items list** showing all detected sound effects
-4. **File names and IDs** are displayed for each item
+---
 
-### Step 4: Monitor Downloads
-1. **Downloads start automatically** after scanning completes
-2. **Use pause/resume/cancel** controls during download
-3. **Progress bar shows** current download status
-4. **Files are saved** to `Downloads/pixabay_sound_effects/`
+## 🖼️ Screenshots
 
-## Design Features
+> **Upload your screenshots to the `screenshots/` folder using these filenames:**
+> - `popup-main.png` — Main popup view
+> - `popup-status-standby.png` — Status: Standby
+> - `popup-status-ready.png` — Status: Ready
+> - `popup-status-error.png` — Status: Error
+> - `scan-results.png` — Scan results list
+> - `download-manager.png` — Download manager section
+> - `settings-panel.png` — Settings/config panel
 
-### Pixabay Green Branding
-- **Primary Color**: `#4bc24b` (Pixabay Green)
-- **Secondary Colors**: White and gray tones
-- **Consistent Styling**: Matches Pixabay's official design language
-- **Green "PeX" Icon**: Instantly recognizable extension icon
+| Main Popup | Status: Standby | Status: Ready |
+|:----------:|:---------------:|:-------------:|
+| ![Main](screenshots/popup-main.png) | ![Standby](screenshots/popup-status-standby.png) | ![Ready](screenshots/popup-status-ready.png) |
 
-### User Interface
-- **420x650px Popup**: Optimized for Chrome extensions
-- **Clean Layout**: Focused on sound effects extraction
-- **Real-time Feedback**: Live status updates and progress tracking
-- **Item Preview**: See exactly what will be downloaded
-- **User Info Display**: Shows profile picture, name, and user ID
+| Status: Error | Scan Results | Download Manager | Settings Panel |
+|:-------------:|:------------:|:----------------:|:--------------:|
+| ![Error](screenshots/popup-status-error.png) | ![Scan](screenshots/scan-results.png) | ![Download](screenshots/download-manager.png) | ![Settings](screenshots/settings-panel.png) |
 
-## Technical Details
+---
 
-### Advanced Selector Technology
-```javascript
-// Primary selectors for Pixabay audio content
-const overlayContainers = document.querySelectorAll('.overlayContainer--0ZpHP.lazyImg--u6+yh');
-const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
-const titleElements = audioRow.querySelector('.nameAndTitle--KcBAZ');
+## 🛠️ How It Works
 
-// User profile selectors
-const userAvatar = document.querySelector('.image--vdlQM');
-const userName = document.querySelector('.h1--bZ6EI.L--opXRs');
+1. **DOM Scraping:** Uses advanced CSS selectors to find all sound effect entries on the current Pixabay page.
+2. **User Detection:** Shows user info if on a profile page.
+3. **Scan & Download:** Scans for audio, then downloads all found files with organized naming.
+4. **Progress Tracking:** Real-time status, progress bar, and controls for pause/resume/cancel.
+
+---
+
+## 🧩 Extension Workflow (Mermaid Diagram)
+
+```mermaid
+flowchart TD
+   A[User opens Pixabay page] --> B[Clicks extension icon]
+   B --> C[Extension scans DOM for audio]
+   C --> D[Shows list of found sound effects]
+   D --> E[User clicks Download]
+   E --> F[Downloads all audio files]
+   F --> G[Shows progress and status]
 ```
 
-### Smart Content Detection
-- **Specific CSS Classes**: Targets exact Pixabay audio elements
-- **Multiple Selector Strategies**: Primary and fallback detection methods
-- **Progressive Loading**: Scrolls through pages to load all available content
-- **Title Extraction**: Gets sound effect names from DOM elements
-- **User Profile Recognition**: Extracts user information when available
+---
 
-### Download Management
-- **Chrome Downloads API**: Native browser download integration
-- **Organized Structure**: `pixabay_sound_effects/title_id.mp3` format
-- **Filename Sanitization**: Safe file names for all operating systems
-- **Progress Tracking**: Real-time download status updates
+## 🎨 Design & Features
+
+- **Pixabay Green Theme** (`#4bc24b`)
+- Clean, modern popup UI
+- Real-time feedback and progress
+- Organized downloads and user folders
+- No API key required
+
+---
+
+## ⚙️ Technical Details
+
+**Selectors Example:**
+```js
+const audioRows = document.querySelectorAll('.audioRow--nAm4Z');
+const titleElements = audioRow.querySelector('.nameAndTitle--KcBAZ');
+```
+
+- Uses Chrome Downloads API
+- Safe, sanitized filenames
+- Handles user profiles and categories
+
+---
+
+## 📂 Screenshots Folder
+
+Please upload your screenshots to the `screenshots/` folder using the exact filenames above for best README rendering.
 
 ## File Structure
 
