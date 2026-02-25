@@ -30,22 +30,19 @@ A Chrome extension to extract and download sound effects from Pixabay pages. No 
 
 ## 🖼️ Screenshots
 
-> **Upload your screenshots to the `screenshots/` folder using these filenames:**
-> - `popup-main.png` — Main popup view
-> - `popup-status-standby.png` — Status: Standby
-> - `popup-status-ready.png` — Status: Ready
-> - `popup-status-error.png` — Status: Error
-> - `scan-results.png` — Scan results list
-> - `download-manager.png` — Download manager section
-> - `settings-panel.png` — Settings/config panel
+### Usage Flow (GIF)
 
-| Main Popup | Status: Standby | Status: Ready |
-|:----------:|:---------------:|:-------------:|
-| ![Main](screenshots/popup-main.png) | ![Standby](screenshots/popup-status-standby.png) | ![Ready](screenshots/popup-status-ready.png) |
+![Usage Flow](screenshots/download-flow.gif)
 
-| Status: Error | Scan Results | Download Manager | Settings Panel |
-|:-------------:|:------------:|:----------------:|:--------------:|
-| ![Error](screenshots/popup-status-error.png) | ![Scan](screenshots/scan-results.png) | ![Download](screenshots/download-manager.png) | ![Settings](screenshots/settings-panel.png) |
+### Key UI States
+
+| Extension Location | Status: Standby | Status: Ready | Status: Error |
+|:------------------:|:---------------:|:-------------:|:-------------:|
+| ![Extension Location](screenshots/extension-location.png) | ![Standby](screenshots/status-standby.png) | ![Ready](screenshots/status-ready.png) | ![Error](screenshots/status-error.png) |
+
+| Settings Panel |
+|:-------------:|
+| ![Settings](screenshots/settings.png) |
 
 ---
 
